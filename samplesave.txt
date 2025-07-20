@@ -8,12 +8,11 @@
 # key data (the first 30 lines have been reserved for any non map information that needs to be saved)
 john # player name
 0 # day
-0 # gold
+0 # GP
 0 # steps taken 
 0 # pickaxe level
 0 # backpack level
 town # game state
-
 
 
 

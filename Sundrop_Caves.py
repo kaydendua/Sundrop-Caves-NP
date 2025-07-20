@@ -10,6 +10,8 @@ MAP_HEIGHT = 0
 TURNS_PER_DAY = 20
 WIN_GP = 500
 
+SAVE_FILE_NAME_FORMAT = 'save{}.txt'
+
 minerals = ['copper', 'silver', 'gold']
 mineral_names = {'C': 'copper', 'S': 'silver', 'G': 'gold'}
 pickaxe_price = [50, 150]
@@ -59,7 +61,7 @@ def initialize_game(game_map, fog, player):
 
     clear_fog(fog, player)
     
-# This function draws the entire map, covered by the fof
+# This function draws the entire map, covered by the fog
 def draw_map(game_map, fog, player):
     return
 
@@ -95,7 +97,7 @@ def save_file_details(filename):
 def save_file_slots():
     for slot in range(1,6):
         print('----- Slot {} -----'.format(slot))
-        save_file_info = save_file_details('save{}.txt'.format(slot))
+        save_file_info = save_file_details(SAVE_FILE_NAME_FORMAT.format(slot))
         if save_file_info:
             for info in save_file_info:
                 print(info)
@@ -107,16 +109,37 @@ def save_file_slots():
 
 # This function saves the game
 def save_game(game_map, fog, player):
-    # save map
-    # save fog
+    # get save file
+    save_file_slots()
+    savefile = SAVE_FILE_NAME_FORMAT.format(prompt(['1','2','3','4','5']))
+    save_data = []
     # save player
-    return
+    save_data.append(player['name'])
+    # save_data.append(player['day'])
+    # save_data.append(player['GP'])
+    # save_data.append(player['steps'])
+    # save_data.append(player['pickaxe_level'])
+
+    # padding
+    save_data.append('\n' * ((30 - len(save_data)) - 1))
+
+    # save map
+    for row in game_map:
+        save_data.append('\n'.join(row))
+    # save fog
+    for row in fog:
+        save_data.append('\n'.join(row))
+    
+    with open(savefile, 'w') as savefile:
+        savefile.write('\n'.join(save_data))
+    print('Game saved.')
+    pass
         
 # This function loads the game
 def load_game(game_map, fog, player):
+    # load player
     # load map
     # load fog
-    # load player
     return
 
 # This function handles all prompts. It takes in a list of valid inputs and
@@ -167,5 +190,5 @@ print("  and live happily ever after?")
 print("-----------------------------------------------------------")
 
 player_input = main_menu()
-save_file_slots()
+save_game([],[],{'name':'john'})
     
