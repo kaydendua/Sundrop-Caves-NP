@@ -10,7 +10,7 @@ MAP_HEIGHT = 0
 TURNS_PER_DAY = 20
 WIN_GP = 500
 
-SAVE_FILE_NAME_FORMAT = 'save{}.txt'
+SAVE_FILE_NAME = 'save{}.txt'
 
 minerals = ['copper', 'silver', 'gold']
 mineral_names = {'C': 'copper', 'S': 'silver', 'G': 'gold'}
@@ -97,7 +97,7 @@ def save_file_details(filename):
 def save_file_slots():
     for slot in range(1,6):
         print('----- Slot {} -----'.format(slot))
-        save_file_info = save_file_details(SAVE_FILE_NAME_FORMAT.format(slot))
+        save_file_info = save_file_details(SAVE_FILE_NAME.format(slot))
         if save_file_info:
             for info in save_file_info:
                 print(info)
@@ -111,9 +111,13 @@ def save_file_slots():
 def save_game(game_map, fog, player):
     # get save file
     save_file_slots()
-    savefile = SAVE_FILE_NAME_FORMAT.format(prompt(['1','2','3','4','5']))
+    savefile = SAVE_FILE_NAME.format(prompt(['1','2','3','4','5']))
     save_data = []
-    # save player
+
+    # save player 
+    # rather have a big block of code that shows how save data is written
+    # instead of a for loop just adding each item from player.values()
+    # also this way I don't need to worry about the order of the player dict
     save_data.append(player['name'])
     # save_data.append(player['day'])
     # save_data.append(player['GP'])
@@ -152,17 +156,7 @@ def prompt(valid, message='Your choice? '):
         else:
             print('"{}" is not a valid input. Please try again.'.format(player_input))
 
-def main_menu():
-    print()
-    print("--- Main Menu ----")
-    print("(N)ew game")
-    print("(L)oad saved game")
-#    print("(H)igh scores")
-    print("(Q)uit")
-    print("------------------")
-    return prompt(['n','l','q'])
-
-def town_menu():
+def show_town_menu():
     print()
     # TODO: Show Day
     print("----- Sundrop Town -----")
@@ -179,6 +173,30 @@ def town_menu():
 def game():
     pass
 
+# Handle player prompting and input for main menu
+def show_main_menu():
+    print()
+    print("--- Main Menu ----")
+    print("(N)ew game")
+    print("(L)oad saved game")
+#    print("(H)igh scores")
+    print("(Q)uit")
+    print("------------------")
+    return prompt(['n','l','q'])
+
+# Manage main menu navigation
+def main_menu():
+    main_menu_choice = show_main_menu()
+    assert main_menu_choice in ['n','l','q']
+    if main_menu_choice == 'n':
+        initialize_game()
+        game() 
+    elif main_menu_choice == 'l':
+        load_game()
+        game()
+    else:
+        pass
+
 #--------------------------- MAIN GAME ---------------------------
 game_state = 'main'
 print("---------------- Welcome to Sundrop Caves! ----------------")
@@ -190,5 +208,5 @@ print("  and live happily ever after?")
 print("-----------------------------------------------------------")
 
 player_input = main_menu()
-save_game([],[],{'name':'john'})
+
     
