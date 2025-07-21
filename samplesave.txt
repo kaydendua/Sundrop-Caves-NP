@@ -6,15 +6,19 @@
 # fog map: 61-70
 # cave changes map: 71-80
 #
-# key data (the first 50 lines have been reserved for any non map information that needs to be saved)
+# player data (the first 50 lines have been reserved for any non map information that needs to be saved)
 # its formatted with key,value for easy translation to player dict
-john # player name
-0 # day
-0 # GP
-0 # steps taken 
-0 # pickaxe level
-0 # backpack level
-town # game state
+name,John
+day,1
+GP,0
+steps,0
+x,0
+y,0
+copper,0
+silver,0
+gold,0
+turns,0
+
 
 
 
