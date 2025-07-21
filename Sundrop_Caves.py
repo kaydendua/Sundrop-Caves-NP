@@ -2,6 +2,7 @@ from random import randint
 
 player = {}
 game_map = []
+current_map = []
 fog = []
 
 MAP_WIDTH = 0
@@ -21,45 +22,80 @@ prices['copper'] = (1, 3)
 prices['silver'] = (5, 8)
 prices['gold'] = (10, 18)
 
-# This function loads a map structure (a nested list) from a file
+# This function converts the map data from the save file into a nested list
 # It also updates MAP_WIDTH and MAP_HEIGHT
-def load_map(filename, map_struct):
-    map_file = open(filename, 'r')
+def load_map(map_data, game_map, current_map):
+
     global MAP_WIDTH
     global MAP_HEIGHT
-    
-    map_struct.clear()
-    
-    # TODO: Add your map loading code here
-    
-    MAP_WIDTH = len(map_struct[0])
-    MAP_HEIGHT = len(map_struct)
 
-    map_file.close()
+    game_map.clear()
+    current_map.clear()
+    
+    for row in map_data:
+        map_row = []
+        for node in row:
+            map_row.append(node)
+        game_map.append(map_row)
+
+    current_map.extend(game_map)
+        
+    MAP_WIDTH = len(game_map[0])
+    MAP_HEIGHT = len(game_map)
+
+# loads fog map from save data
+def load_fog(save_data):
+    fog = []
+    for line in range(60,70):
+        fog.append(save_data[line])
+    return fog
+
+# This function retrieves the map from the level1.txt file. It will be replaced with a map generator.
+def get_map():
+    map_data = []
+    with open('level1.txt', 'r') as map_file:
+        for line in map_file:
+            map_data.append(line)
+    return map_data
+
+# Creates a new fog map
+def create_fog(fog):
+    fog.clear()
+    for y in range(MAP_HEIGHT):
+        fog_row = []
+        for x in range(MAP_WIDTH):
+            fog_row.append('?')
+        fog.append(fog_row)
 
 # This function clears the fog of war at the 3x3 square around the player
 def clear_fog(fog, player):
     return
 
-def initialize_game(game_map, fog, player):
+def initialize_game(save_file, game_map, fog, current_map, player):
     # initialize map
-    load_map("level1.txt", game_map)
+    load_map(get_map(), game_map, current_map)
 
     # TODO: initialize fog
+    create_fog(fog)
     
     # TODO: initialize player
     #   You will probably add other entries into the player dictionary
+    name = prompt(message="Greetings, miner! What is your name? ")
+    if name:
+        player['name'] = name
+    else: # default player name if nothing was entered
+        player['name'] = 'Player'
     player['x'] = 0
     player['y'] = 0
     player['copper'] = 0
     player['silver'] = 0
     player['gold'] = 0
     player['GP'] = 0
-    player['day'] = 0
+    player['day'] = 1
     player['steps'] = 0
     player['turns'] = TURNS_PER_DAY
 
-    clear_fog(fog, player)
+    return game_map, current_map, fog, player
     
 # This function draws the entire map, covered by the fog
 def draw_map(game_map, fog, player):
@@ -73,18 +109,19 @@ def draw_view(game_map, fog, player):
 def show_information(player):
     return
 
-# This function reads key information from a save file for display, 
+# This function reads key information from a save file for temporary display, 
 # such as the player name, day, gold and steps taken.
-def save_file_details(filename):
+def save_file_details(slot_choice):
     '''
     All info to be displayed is appended into a list to be printed,
     rather than loaded into individual variables
     as this information does not need to be saved into memory for the game to run
     and will just be unneccessary fluff
     '''
+    save_file = SAVE_FILE_NAME.format(slot_choice)
     save_file_info = [] 
     try: 
-        with open(filename, 'r') as save:
+        with open(save_file, 'r') as save:
             save_file_info.append(save.readline().strip()) # get name
             save_file_info.append('DAY ' + save.readline().strip())
             save_file_info.append('GP: ' + save.readline().strip())
@@ -94,50 +131,58 @@ def save_file_details(filename):
         return None
     
 # Sundrop Caves has 5 save slots. This function will handle the selection logic.
-def save_file_slots():
+def choose_save_slot():
     for slot in range(1,6):
         print('----- Slot {} -----'.format(slot))
-        save_file_info = save_file_details(SAVE_FILE_NAME.format(slot))
+        save_file_info = save_file_details(slot)
         if save_file_info:
             for info in save_file_info:
                 print(info)
         else:
             print('Empty save slot')
     print('------------------')
-    return
-
+    slot_choice = prompt(['1','2','3','4','5','x'], "Please select a save slot (X to cancel): ")
+    if save_file_details(slot_choice):
+        if prompt(['y','n'], 'Warning! The save slot you have chosen already contains a save file. Are you sure you want to override it? [Y/N]: ') != 'Y':
+            print("Cancelling save.")
+            return choose_save_slot() # Recursion until decision is made
+        else:
+            return slot_choice
+    else:
+        return slot_choice
 
 # This function saves the game
-def save_game(game_map, fog, player):
+def save_game(game_map, fog, current_map, player):
     # get save file
-    save_file_slots()
-    savefile = SAVE_FILE_NAME.format(prompt(['1','2','3','4','5']))
+    
+    slot_choice = choose_save_slot()
+    if slot_choice == 'x':
+        return
+    save_file = SAVE_FILE_NAME.format(slot_choice)
+
     save_data = []
 
     # save player 
-    # rather have a big block of code that shows how save data is written
-    # instead of a for loop just adding each item from player.values()
-    # also this way I don't need to worry about the order of the player dict
-    save_data.append(player['name'])
-    # save_data.append(player['day'])
-    # save_data.append(player['GP'])
-    # save_data.append(player['steps'])
-    # save_data.append(player['pickaxe_level'])
+    # saves key alongside value for flexibility
+    for key in player:
+        save_data.append('{},{}'.format(key, player[key]))
 
     # padding
-    save_data.append('\n' * ((30 - len(save_data)) - 1))
+    save_data.append('\n' * ((50 - len(save_data)) - 1))
 
-    # save map
+    # save game map
     for row in game_map:
         save_data.append('\n'.join(row))
     # save fog
     for row in fog:
         save_data.append('\n'.join(row))
+    # save current map
+    for row in current_map:
+        save_data.append('\n'.join(row))
     
-    with open(savefile, 'w') as savefile:
-        savefile.write('\n'.join(save_data))
+    with open(save_file, 'w') as save_file:        
+        save_file.write('\n'.join(save_data))
     print('Game saved.')
-    pass
         
 # This function loads the game
 def load_game(game_map, fog, player):
@@ -148,14 +193,16 @@ def load_game(game_map, fog, player):
 
 # This function handles all prompts. It takes in a list of valid inputs and
 # loops until it receives a valid input.
-def prompt(valid, message='Your choice? '):      
+def prompt(valid=[], message='Your choice? '):      
     while True:
         player_input = input(message).lower()
-        if player_input in valid:
+        if not valid: # empty valid array means all inputs are accepted
+            return player_input
+        elif player_input in valid:
             return player_input     
         else:
             print('"{}" is not a valid input. Please try again.'.format(player_input))
-
+# Display town menu
 def show_town_menu():
     print()
     # TODO: Show Day
@@ -167,13 +214,13 @@ def show_town_menu():
     print("Sa(V)e game")
     print("(Q)uit to main menu")
     print("------------------------")
-    return prompt(['b','i','m','e','v','q'])
+    # prompt(['b','i','m','e','v','q'])
 
 # it insists upon itself
 def game():
     pass
 
-# Handle player prompting and input for main menu
+# Display main menu
 def show_main_menu():
     print()
     print("--- Main Menu ----")
@@ -182,14 +229,19 @@ def show_main_menu():
 #    print("(H)igh scores")
     print("(Q)uit")
     print("------------------")
-    return prompt(['n','l','q'])
 
 # Manage main menu navigation
 def main_menu():
-    main_menu_choice = show_main_menu()
-    assert main_menu_choice in ['n','l','q']
+    show_main_menu()
+    main_menu_choice = prompt(['n','l','q'])
+
     if main_menu_choice == 'n':
-        initialize_game()
+        slot_choice = choose_save_slot()
+        print(slot_choice)
+        if slot_choice == 'x':
+            return
+        save_file = SAVE_FILE_NAME.format(slot_choice)
+        initialize_game(save_file, game_map, current_map, fog, player)
         game() 
     elif main_menu_choice == 'l':
         load_game()
@@ -207,6 +259,5 @@ print("How quickly can you get the 1000 GP you need to retire")
 print("  and live happily ever after?")
 print("-----------------------------------------------------------")
 
-player_input = main_menu()
-
+main_menu()
     
