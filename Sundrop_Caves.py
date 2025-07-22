@@ -1,5 +1,7 @@
 from random import randint
 
+# it deeply upsets me that i cannot use classes
+
 player = {}
 game_map = []
 current_map = []
@@ -18,6 +20,7 @@ TURNS_PER_DAY = 20
 WIN_GP = 500
 
 PICKAXE_MAX_LEVEL = 2
+BACKPACK_UPGRADE_AMOUNT = 2
 
 SAVE_FILE_NAME = 'save{}.txt'
 
@@ -142,8 +145,7 @@ def show_information(player):
 
 # This function reads key information from a save file for temporary display, 
 # such as the player name, day, gold and steps taken, and returns it as a list of strings to be printed
-def save_file_details(slot_choice):
-    save_file = SAVE_FILE_NAME.format(slot_choice)
+def save_file_details(save_file):
     save_file_info = [] 
     try: 
         with open(save_file, 'r') as save:
@@ -160,7 +162,8 @@ def choose_save_slot(saving=True):
     while True:
         for slot in range(1, MAX_SAVE_SLOTS + 1):
             print('----- Slot {} -----'.format(slot))
-            save_file_info = save_file_details(slot)
+            save_file = SAVE_FILE_NAME.format(slot)
+            save_file_info = save_file_details(save_file)
             if save_file_info:
                 for info in save_file_info:
                     print(info)
@@ -170,12 +173,12 @@ def choose_save_slot(saving=True):
 
         save_file = SAVE_FILE_NAME.format(prompt(['1','2','3','4','5','q'], "Please select a save slot (Q to cancel): "))
         if save_file_details(save_file) and saving:
-            if prompt(['y','n'], 'Warning! The save slot you have chosen already contains a save file. Are you sure you want to override it? [Y/N]: ') != 'Y':
+            if prompt(['y','n'], 'Warning! The save slot you have chosen already contains a save file. Are you sure you want to override it? [Y/N]: ') != 'y':
                 print("Cancelling save.")
                 continue
             else:
                 return save_file
-        elif not save_file_details and not saving:
+        elif not save_file_details(save_file) and not saving:
             print('The save slot you chose is empty. Please try again')
             continue
         else:
@@ -216,6 +219,8 @@ def load_game(save_file, game_map, fog, current_map, player):
     for line in range(0,50):
         if save_data[line]:
             info = save_data[line].split(',')
+            if info[1].isdigit():
+                info[1] = int(info[1])
             player[info[0]] = info[1]
         else:
             break
@@ -265,6 +270,7 @@ def show_town_menu():
     print("(Q)uit to main menu")
     print("------------------------")
 
+# Display shop menu and calculate prices
 def show_shop_menu():
     pickaxe_level = player['pickaxe_level']
     backpack_capacity = player['backpack_capacity']
@@ -274,10 +280,10 @@ def show_shop_menu():
     if player['pickaxe_level'] == PICKAXE_MAX_LEVEL:
         print('Your pickaxe cannot be upgraded any further!')
     else:
-        print('(P)ickaxe upgrade to Level {} to mine {} ore for {} GP', pickaxe_level + 1, minerals[pickaxe_level], pickaxe_prices[pickaxe_level])
+        print('(P)ickaxe upgrade to Level {} to mine {} ore for {} GP'.format(pickaxe_level + 1, minerals[pickaxe_level], pickaxe_prices[pickaxe_level]))
         accepted_inputs.append('p')
 
-    print('(B)ackpack upgrade to carry {} items for {} GP'.format(backpack_capacity + 2, backpack_capacity * 2))
+    print('(B)ackpack upgrade to carry {} items for {} GP'.format(backpack_capacity + BACKPACK_UPGRADE_AMOUNT, backpack_capacity * 2))
     accepted_inputs.append('b')
 
     print('(L)eave shop ')
@@ -286,14 +292,41 @@ def show_shop_menu():
     print('-----------------------------------------------------------')
     print('GP:', player['GP'])
     print('-----------------------------------------------------------')
-    return pickaxe_prices[pickaxe_level], backpack_capacity * 2
+    return pickaxe_prices[pickaxe_level], backpack_capacity * 2, accepted_inputs
+
+# Manages purchasing upgrades
+def shop_menu(player):
+    while True:
+        pickaxe_price, backpack_price, accepted_inputs = show_shop_menu()
+        choice = prompt(accepted_inputs)
+        if choice == 'p':
+            if pickaxe_price > player['GP']:
+                print("You don't have enough money for this upgrade!")
+            else:
+                print("Congratulations! You can now mine {}!".format(minerals[player['pickaxe_level']]))
+                player['pickaxe_level'] += 1
+                player['GP'] -= pickaxe_price
+            continue
+        elif choice == 'b':
+            if backpack_price > player['GP']:
+                print("You don't have enough money for this upgrade!")
+            else:
+                player['backpack_capacity'] += BACKPACK_UPGRADE_AMOUNT
+                print("Congratulations! You can now carry {} items!".format(player['backpack_capacity']))
+                player['GP'] -= backpack_price
+            continue           
+        else:
+            break
     
 # it insists upon itself
 def game(save_file, game_map, fog, current_map, player):
-    show_town_menu(player)
-    player_action = prompt(['b','i','m','e','v','q'])
-    if player_action == 'b':
-        shop_menu(player)
+    while True:
+        show_town_menu()
+        player_action = prompt(['b','i','m','e','v','q'])
+        if player_action == 'b':
+            shop_menu(player)
+        else:
+            break
 
 # Display main menu
 def show_main_menu():
@@ -324,7 +357,7 @@ def main_menu(game_map, fog, current_map, player):
             load_game(save_file, game_map, fog, current_map, player)
             game(save_file, game_map, fog, current_map, player)
         else:
-            pass
+            break
 
 #--------------------------- MAIN GAME ---------------------------
 game_state = 'main'
