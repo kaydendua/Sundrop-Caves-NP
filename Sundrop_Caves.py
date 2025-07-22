@@ -5,6 +5,9 @@ game_map = []
 current_map = []
 fog = []
 
+MAX_SAVE_SLOTS = 5
+
+PLAYER_DICT_SIZE = 12
 MAP_NODES = ['T', 'C', 'S', 'G', 'P']
 FOG_NODES = ['?']
 
@@ -14,11 +17,13 @@ MAP_HEIGHT = 0
 TURNS_PER_DAY = 20
 WIN_GP = 500
 
+PICKAXE_MAX_LEVEL = 2
+
 SAVE_FILE_NAME = 'save{}.txt'
 
 minerals = ['copper', 'silver', 'gold']
 mineral_names = {'C': 'copper', 'S': 'silver', 'G': 'gold'}
-pickaxe_price = [50, 150]
+pickaxe_prices = [0, 50, 150]
 
 prices = {}
 prices['copper'] = (1, 3)
@@ -42,7 +47,6 @@ def text_to_list(data, start_read, end_read, target, clean=[]):
             else:
                 row.append(' ')
         target.append(row)
-
 
 # This function converts the map data from the save file into a nested list
 # It also updates MAP_WIDTH and MAP_HEIGHT
@@ -105,6 +109,7 @@ def initialize_game(save_file, game_map, fog, current_map, player):
         player['name'] = name
     else: # default player name if nothing was entered
         player['name'] = 'Player'
+    print('Pleased to meet you, {}. Welcome to Sundrop Town!'.format(name))
     player['day'] = 1
     player['GP'] = 0
     player['steps'] = 0
@@ -116,6 +121,8 @@ def initialize_game(save_file, game_map, fog, current_map, player):
     player['silver'] = 0
     player['gold'] = 0
     player['turns'] = TURNS_PER_DAY
+    player['pickaxe_level'] = 1
+    player['backpack_capacity'] = 10
 
     save_game(save_file, game_map, fog, current_map, player)
 
@@ -150,28 +157,29 @@ def save_file_details(slot_choice):
     
 # Sundrop Caves has 5 save slots. This function will handle the selection logic.
 def choose_save_slot(saving=True):
-    for slot in range(1,6):
-        print('----- Slot {} -----'.format(slot))
-        save_file_info = save_file_details(slot)
-        if save_file_info:
-            for info in save_file_info:
-                print(info)
-        else:
-            print('Empty save slot')
-    print('------------------')
+    while True:
+        for slot in range(1, MAX_SAVE_SLOTS + 1):
+            print('----- Slot {} -----'.format(slot))
+            save_file_info = save_file_details(slot)
+            if save_file_info:
+                for info in save_file_info:
+                    print(info)
+            else:
+                print('Empty save slot')
+        print('------------------')
 
-    save_file = SAVE_FILE_NAME.format(prompt(['1','2','3','4','5','q'], "Please select a save slot (Q to cancel): "))
-    if save_file_details(save_file) and saving:
-        if prompt(['y','n'], 'Warning! The save slot you have chosen already contains a save file. Are you sure you want to override it? [Y/N]: ') != 'Y':
-            print("Cancelling save.")
-            return choose_save_slot() # Recursion until decision is made
+        save_file = SAVE_FILE_NAME.format(prompt(['1','2','3','4','5','q'], "Please select a save slot (Q to cancel): "))
+        if save_file_details(save_file) and saving:
+            if prompt(['y','n'], 'Warning! The save slot you have chosen already contains a save file. Are you sure you want to override it? [Y/N]: ') != 'Y':
+                print("Cancelling save.")
+                continue
+            else:
+                return save_file
+        elif not save_file_details and not saving:
+            print('The save slot you chose is empty. Please try again')
+            continue
         else:
             return save_file
-    elif not save_file_details and not saving:
-        print('The save slot you chose is empty. Please try again')
-        return choose_save_slot() # Recursion until decision is made
-    else:
-        return save_file
 
 # This function saves the game
 def save_game(save_file, game_map, fog, current_map, player):
@@ -223,7 +231,7 @@ def load_game(save_file, game_map, fog, current_map, player):
 
     try:
         error_detect = 'Missing player data.'
-        assert len(player) == 10
+        assert len(player) == PLAYER_DICT_SIZE
         error_detect = 'Map size mismatch'
         assert len(fog[0]) == MAP_WIDTH and len(fog) == MAP_HEIGHT
         assert len(current_map[0]) == MAP_WIDTH and len(current_map) == MAP_HEIGHT
@@ -243,10 +251,11 @@ def prompt(valid=[], message='Your choice? '):
             return player_input     
         else:
             print('"{}" is not a valid input. Please try again.'.format(player_input))
+
 # Display town menu
 def show_town_menu():
     print()
-    # TODO: Show Day
+    print("DAY", player['day'])
     print("----- Sundrop Town -----")
     print("(B)uy stuff")
     print("See Player (I)nformation")
@@ -255,11 +264,36 @@ def show_town_menu():
     print("Sa(V)e game")
     print("(Q)uit to main menu")
     print("------------------------")
-    # prompt(['b','i','m','e','v','q'])
 
+def show_shop_menu():
+    pickaxe_level = player['pickaxe_level']
+    backpack_capacity = player['backpack_capacity']
+    accepted_inputs = []
+    print()
+    print('----------------------- Shop Menu -------------------------')
+    if player['pickaxe_level'] == PICKAXE_MAX_LEVEL:
+        print('Your pickaxe cannot be upgraded any further!')
+    else:
+        print('(P)ickaxe upgrade to Level {} to mine {} ore for {} GP', pickaxe_level + 1, minerals[pickaxe_level], pickaxe_prices[pickaxe_level])
+        accepted_inputs.append('p')
+
+    print('(B)ackpack upgrade to carry {} items for {} GP'.format(backpack_capacity + 2, backpack_capacity * 2))
+    accepted_inputs.append('b')
+
+    print('(L)eave shop ')
+    accepted_inputs.append('l')
+
+    print('-----------------------------------------------------------')
+    print('GP:', player['GP'])
+    print('-----------------------------------------------------------')
+    return pickaxe_prices[pickaxe_level], backpack_capacity * 2
+    
 # it insists upon itself
-def game():
-    pass
+def game(save_file, game_map, fog, current_map, player):
+    show_town_menu(player)
+    player_action = prompt(['b','i','m','e','v','q'])
+    if player_action == 'b':
+        shop_menu(player)
 
 # Display main menu
 def show_main_menu():
@@ -272,24 +306,25 @@ def show_main_menu():
     print("------------------")
 
 # Manage main menu navigation
-def main_menu():
-    show_main_menu()
-    main_menu_choice = prompt(['n','l','q'])
+def main_menu(game_map, fog, current_map, player):
+    while True:
+        show_main_menu()
+        main_menu_choice = prompt(['n','l','q'])
 
-    if main_menu_choice == 'n':
-        save_file = choose_save_slot()
-        if 'q' in save_file:
-            return
-        initialize_game(save_file, game_map, fog, current_map, player)
-        game() 
-    elif main_menu_choice == 'l':
-        save_file = choose_save_slot(False)
-        if 'q' in save_file:
-            return
-        load_game(save_file, game_map, fog, current_map, player)
-        game()
-    else:
-        pass
+        if main_menu_choice == 'n':
+            save_file = choose_save_slot()
+            if 'q' in save_file:
+                continue
+            initialize_game(save_file, game_map, fog, current_map, player)
+            game(save_file, game_map, fog, current_map, player) 
+        elif main_menu_choice == 'l':
+            save_file = choose_save_slot(False)
+            if 'q' in save_file:
+                continue
+            load_game(save_file, game_map, fog, current_map, player)
+            game(save_file, game_map, fog, current_map, player)
+        else:
+            pass
 
 #--------------------------- MAIN GAME ---------------------------
 game_state = 'main'
@@ -301,9 +336,4 @@ print("How quickly can you get the 1000 GP you need to retire")
 print("  and live happily ever after?")
 print("-----------------------------------------------------------")
 
-main_menu()
-print(game_map)
-print(fog)
-print(current_map)
-print(player)
-    
+main_menu(game_map, fog, current_map, player)
