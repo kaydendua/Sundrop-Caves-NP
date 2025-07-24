@@ -18,7 +18,9 @@ copper,0
 silver,0
 gold,0
 turns,0
-
+torch_level,1
+portal_x,0
+portal_y,0
 
 
 

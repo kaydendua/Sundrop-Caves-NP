@@ -9,7 +9,7 @@ fog = []
 
 MAX_SAVE_SLOTS = 5
 
-PLAYER_DICT_SIZE = 13
+PLAYER_DICT_SIZE = 16
 MAP_NODES = ['T', 'C', 'S', 'G', 'P']
 FOG_NODES = ['?']
 
@@ -125,6 +125,9 @@ def initialize_game(save_file, game_map, fog, current_map, player):
     player['pickaxe_level'] = 1
     player['backpack_capacity'] = 10
     player['torch_level'] = 1
+    player['portal_x'] = 0
+    player['portal_y'] = 0
+    player['backpack_storage'] = []
 
     save_game(save_file, game_map, fog, current_map, player)
 
@@ -172,9 +175,11 @@ def draw_view(current_map, player, nodes, view_padding):
         row = node[0]
         col = node[1]
         
-        if -1 < row < MAP_HEIGHT and -1 < col < MAP_WIDTH: # In bounds
+        if node == [0,0]:
+            view += 'M'
+        elif -1 < row < MAP_HEIGHT and -1 < col < MAP_WIDTH: # In bounds
             view += current_map[row][col]
-        elif row == -1 or row == MAP_HEIGHT or col == -1 or col == MAP_WIDTH: # Border
+        elif ((row == -1  or row == MAP_HEIGHT) and -1 <= col <= MAP_WIDTH) or ((col == -1 or col == MAP_WIDTH) and -1 <= row <= MAP_HEIGHT): # Border
             view += '#'
         else: # Out of bounds
             view += ' '
@@ -193,7 +198,18 @@ def draw_view(current_map, player, nodes, view_padding):
 
 # This function shows the information for the player
 def show_information(player):
-    return
+    print()
+    print("----- Player Information -----")
+    print("Name:", player['name'])
+    print("Portal position: ({}, {})".format(player['portal_x'], player['portal_y']))
+    print("Pickaxe level: {} ({})".format(player['pickaxe_level'], minerals[player['pickaxe_level'] - 1]))
+    print("------------------------------")
+    print(player['backpack_storage'])
+    print("Load: {} / {}".format(len(player['backpack_storage']), player['backpack_capacity']))
+    print("------------------------------")
+    print("GP:", player['GP'])
+    print("Steps taken:", player['steps'])
+    print("------------------------------")
 
 # This function reads key information from a save file for temporary display, 
 # such as the player name, day, gold and steps taken, and returns it as a list of strings to be printed
@@ -273,10 +289,16 @@ def load_game(save_file, game_map, fog, current_map, player):
     # load player
     for line in range(0,50):
         if save_data[line]:
-            info = save_data[line].split(',')
+            info = save_data[line].split(',', 1)
             if info[1].isdigit():
-                info[1] = int(info[1])
-            player[info[0]] = info[1]
+                data = int(info[1])
+            elif '[' in info[1]:
+                data = info[1].strip('[]').replace("'", "").replace('"', "").split(',')
+                if data == ['']:
+                    data.clear()
+            else:
+                data = info[1]
+            player[info[0]] = data
         else:
             break
 
@@ -382,6 +404,8 @@ def game(save_file, game_map, fog, current_map, player):
         player_action = prompt(['b','i','m','e','v','q'])
         if player_action == 'b':
             shop_menu(player)
+        elif player_action == 'i':
+            show_information(player)
         else:
             break
 
