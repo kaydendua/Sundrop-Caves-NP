@@ -9,7 +9,7 @@ fog = []
 
 MAX_SAVE_SLOTS = 5
 
-PLAYER_DICT_SIZE = 12
+PLAYER_DICT_SIZE = 13
 MAP_NODES = ['T', 'C', 'S', 'G', 'P']
 FOG_NODES = ['?']
 
@@ -19,14 +19,16 @@ MAP_HEIGHT = 0
 TURNS_PER_DAY = 20
 WIN_GP = 500
 
-PICKAXE_MAX_LEVEL = 2
+PICKAXE_MAX_LEVEL = 3
 BACKPACK_UPGRADE_AMOUNT = 2
 
 SAVE_FILE_NAME = 'save{}.txt'
 
+VIEW_PADDING = 1
+
 minerals = ['copper', 'silver', 'gold']
 mineral_names = {'C': 'copper', 'S': 'silver', 'G': 'gold'}
-pickaxe_prices = [0, 50, 150]
+pickaxe_prices = [0, 50, 150, None]
 
 prices = {}
 prices['copper'] = (1, 3)
@@ -91,10 +93,6 @@ def create_fog(fog):
             fog_row.append('?')
         fog.append(fog_row)
 
-# This function clears the fog of war at the 3x3 square around the player
-def clear_fog(fog, player):
-    return
-
 def initialize_game(save_file, game_map, fog, current_map, player):
     # initialize map
     load_map(get_map(), 0, 10, game_map)
@@ -126,18 +124,72 @@ def initialize_game(save_file, game_map, fog, current_map, player):
     player['turns'] = TURNS_PER_DAY
     player['pickaxe_level'] = 1
     player['backpack_capacity'] = 10
+    player['torch_level'] = 1
 
     save_game(save_file, game_map, fog, current_map, player)
 
     return game_map, current_map, fog, player
     
 # This function draws the entire map, covered by the fog
-def draw_map(game_map, fog, player):
-    return
+def draw_map(current_map, fog):
+    map_view = '+' + '-' * MAP_WIDTH + '+\n'
+
+    for row in range(MAP_HEIGHT):
+        map_row = []
+        for node in range(MAP_WIDTH):
+            if fog[row][node] == '?':
+                map_row.append('?')
+            else:
+                map_row.append(current_map[row][node])
+        map_view += '|' + ''.join(map_row) + '|\n'
+
+    map_view += '+' + '-' * MAP_WIDTH + '+'
+    return map_view
+
+# This function returns an array of all the nodes 
+def get_surrounding_nodes(player):
+    nodes = []
+    # check if node is within +-1 x AND +-1 y
+    for row in range(player['y'] - player['torch_level'], player['y'] + player['torch_level'] + 1):
+        for node in range(player['x'] - player['torch_level'], player['x'] + player['torch_level'] + 1):
+            nodes.append([row, node])
+    return nodes
+
+# This function clears the fog of war at the 3x3 square around the player
+def clear_fog(fog, nodes):
+    for node in nodes:
+        row = node[0]
+        col = node[1]
+        if 0 <= row < MAP_HEIGHT and 0 <= col < MAP_WIDTH:
+            fog[row].pop(col)
 
 # This function draws the 3x3 viewport
-def draw_view(game_map, fog, player):
-    return
+def draw_view(current_map, player, nodes, view_padding):
+    view_size = 2 * player['torch_level'] + 1 
+    view = '+' + '-' * view_size * (view_padding + 1) + '-' * view_padding + '+\n|' + ' ' * view_padding
+    pos = 1
+    for node in nodes:
+        row = node[0]
+        col = node[1]
+        
+        if -1 < row < MAP_HEIGHT and -1 < col < MAP_WIDTH: # In bounds
+            view += current_map[row][col]
+        elif row == -1 or row == MAP_HEIGHT or col == -1 or col == MAP_WIDTH: # Border
+            view += '#'
+        else: # Out of bounds
+            view += ' '
+
+        if pos < view_size:
+            view += view_padding * ' '
+            pos += 1
+        elif node == nodes[-1]:
+            view += ' ' * view_padding + '|\n'
+        else:
+            view += ' ' * view_padding + '|\n|' + ' ' * view_padding
+            pos = 1
+
+    view += '+' + '-' * view_size * (view_padding + 1) + '-' * view_padding + '+' 
+    return view
 
 # This function shows the information for the player
 def show_information(player):
@@ -160,6 +212,7 @@ def save_file_details(save_file):
 # Sundrop Caves has 5 save slots. This function will handle the selection logic.
 def choose_save_slot(saving=True):
     while True:
+        print()
         for slot in range(1, MAX_SAVE_SLOTS + 1):
             print('----- Slot {} -----'.format(slot))
             save_file = SAVE_FILE_NAME.format(slot)
@@ -171,8 +224,10 @@ def choose_save_slot(saving=True):
                 print('Empty save slot')
         print('------------------')
 
-        save_file = SAVE_FILE_NAME.format(prompt(['1','2','3','4','5','q'], "Please select a save slot (Q to cancel): "))
-        if save_file_details(save_file) and saving:
+        save_file = SAVE_FILE_NAME.format(prompt(['1','2','3','4','5','q'], "Please select a save slot (Q to close): "))
+        if 'q' in save_file:
+            return save_file
+        elif save_file_details(save_file) and saving:
             if prompt(['y','n'], 'Warning! The save slot you have chosen already contains a save file. Are you sure you want to override it? [Y/N]: ') != 'y':
                 print("Cancelling save.")
                 continue
@@ -236,6 +291,8 @@ def load_game(save_file, game_map, fog, current_map, player):
 
     try:
         error_detect = 'Missing player data.'
+        assert len(player) >= PLAYER_DICT_SIZE
+        error_detect = 'Extra player data'
         assert len(player) == PLAYER_DICT_SIZE
         error_detect = 'Map size mismatch'
         assert len(fog[0]) == MAP_WIDTH and len(fog) == MAP_HEIGHT
@@ -355,6 +412,9 @@ def main_menu(game_map, fog, current_map, player):
             if 'q' in save_file:
                 continue
             load_game(save_file, game_map, fog, current_map, player)
+            print(draw_map(current_map, fog))
+            nodes = get_surrounding_nodes(player)
+            print(draw_view(current_map, player, nodes, VIEW_PADDING))
             game(save_file, game_map, fog, current_map, player)
         else:
             break
