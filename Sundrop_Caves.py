@@ -158,7 +158,7 @@ def draw_map(current_map, fog):
         for node in range(MAP_WIDTH):
             if fog[row][node] == '?':
                 map_row.append('?')
-            elif player['y'] == row and player['x'] == node:
+            elif player['y'] == row and player['x'] == node: # TODO implement game state to not print if in town
                 map_row.append('M')
             else:
                 map_row.append(current_map[row][node])
@@ -416,9 +416,27 @@ def show_mine_menu(current_map, player):
     print('(WASD) to move')
     print('(M)ap, (I)nformation, (P)ortal, (Q)uit to main menu')
 
+# determines the amount of ore again
+def mine_ore(ore):
+    ore_name = mineral_names[ore]
+    amount_mined = randint(drop_rates[ore_name][0], drop_rates[ore_name][1])
+    return amount_mined
+
 # determines what happens when a player steps on a node
-def interact_node(current_map, player, node):
-    pass
+def interact_node(current_map, player, node_coords):
+    node = current_map[node_coords[0]][node_coords[1]]
+    if node in mineral_names.keys():
+        current_map[node_coords[0]][node_coords[1]] = ' '
+        amount_mined = mine_ore(node)
+        print('You mined {} piece(s) of {}.'.format(amount_mined, mineral_names[node]))
+        for pieces in range(amount_mined):
+            player['backpack_storage'].append(node)
+            if len(player['backpack_storage']) > player['backpack_capacity']:
+                player['backpack_storage'].pop(0)
+                print('...but you can only carry {} more piece(s)!'.format(pieces))
+                break
+    elif node == 'T':
+        pass # TODO return back to town
 
 # handles player movement
 def attempt_move(player_action, player, current_map):
@@ -499,13 +517,7 @@ def mine(game_map, fog, current_map, player):
             portal_stone(player, current_map)
             break
         else:
-            print('WHAAAT???')
-            print(['m', 'i', 'p', 'q'].extend(movement_buttons))
-            print(player_action in ['m', 'i', 'p', 'q'].extend(movement_buttons))
-            print(len(player_action))
             break
-
-
 
 # it insists upon itself
 def game(save_file, game_map, fog, current_map, player):
@@ -553,9 +565,6 @@ def main_menu(game_map, fog, current_map, player):
             if 'q' in save_file:
                 continue
             load_game(save_file, game_map, fog, current_map, player)
-            print(draw_map(current_map, fog))
-            nodes = get_surrounding_nodes(player)
-            print(draw_view(current_map, player, nodes, VIEW_PADDING))
             game(save_file, game_map, fog, current_map, player)
         else:
             break
