@@ -26,6 +26,9 @@ SAVE_FILE_NAME = 'save{}.txt'
 
 VIEW_PADDING = 1
 
+movement_buttons = ['w','a','s','d']
+movement_map = {'w':[-1, 0], 'a':[0, -1], 's':[1, 0], 'd':[0, 1]} # [y, x]
+
 minerals = ['copper', 'silver', 'gold']
 mineral_names = {'C': 'copper', 'S': 'silver', 'G': 'gold'}
 pickaxe_prices = [0, 50, 150, None]
@@ -39,6 +42,19 @@ drop_rates = {}
 drop_rates['copper'] = (1, 5)
 drop_rates['silver'] = (1, 3)
 drop_rates['gold'] = (1, 2)
+
+# This function handles all prompts. It takes in a list of valid inputs and
+# loops until it receives a valid input.
+def prompt(valid=[], message='Your choice? '):      
+    while True:
+        player_input = input(message).lower()
+        check = player_input.lower()
+        if not valid: # empty valid array means all inputs are accepted
+            return check
+        elif check in valid:
+            return check
+        else:
+            print('"{}" is not a valid input. Please try again.'.format(player_input))
 
 # Converts text data to nested list and loads it into a variable (target)
 # Also optionally cleans unwanted data
@@ -142,6 +158,8 @@ def draw_map(current_map, fog):
         for node in range(MAP_WIDTH):
             if fog[row][node] == '?':
                 map_row.append('?')
+            elif player['y'] == row and player['x'] == node:
+                map_row.append('M')
             else:
                 map_row.append(current_map[row][node])
         map_view += '|' + ''.join(map_row) + '|\n'
@@ -164,7 +182,11 @@ def clear_fog(fog, nodes):
         row = node[0]
         col = node[1]
         if 0 <= row < MAP_HEIGHT and 0 <= col < MAP_WIDTH:
-            fog[row].pop(col)
+            try:
+                fog[row][col] = ' '
+            except IndexError:
+                print(node)
+                print(fog)
 
 # This function draws the 3x3 viewport
 def draw_view(current_map, player, nodes, view_padding):
@@ -175,7 +197,7 @@ def draw_view(current_map, player, nodes, view_padding):
         row = node[0]
         col = node[1]
         
-        if node == [0,0]:
+        if node == [player['y'], player['x']]:
             view += 'M'
         elif -1 < row < MAP_HEIGHT and -1 < col < MAP_WIDTH: # In bounds
             view += current_map[row][col]
@@ -323,19 +345,6 @@ def load_game(save_file, game_map, fog, current_map, player):
         print("Error in save data.", error_detect)
         quit()
 
-
-# This function handles all prompts. It takes in a list of valid inputs and
-# loops until it receives a valid input.
-def prompt(valid=[], message='Your choice? '):      
-    while True:
-        player_input = input(message).lower()
-        if not valid: # empty valid array means all inputs are accepted
-            return player_input
-        elif player_input in valid:
-            return player_input     
-        else:
-            print('"{}" is not a valid input. Please try again.'.format(player_input))
-
 # Display town menu
 def show_town_menu():
     print()
@@ -396,7 +405,108 @@ def shop_menu(player):
             continue           
         else:
             break
+
+def show_mine_menu(current_map, player):
+    print()
+    print('DAY', player['day'])
+    nodes = get_surrounding_nodes(player)
+    viewport = draw_view(current_map, player, nodes, VIEW_PADDING)
+    print(viewport)
+    print('Turns left: {:<5} Load: {} / {}    Steps: {}'.format(player['turns'], len(player['backpack_storage']), player['backpack_capacity'], player['steps']))
+    print('(WASD) to move')
+    print('(M)ap, (I)nformation, (P)ortal, (Q)uit to main menu')
+
+# determines what happens when a player steps on a node
+def interact_node(current_map, player, node):
+    pass
+
+# handles player movement
+def attempt_move(player_action, player, current_map):
+    print()
+    print('-----------------------------------------------------')
+    test_y = player['y'] + movement_map[player_action][0]
+    test_x = player['x'] + movement_map[player_action][1]
+
+    # movement rules; kept seperate from return logic for organisation
+    if -1 < test_y < MAP_HEIGHT and -1 < test_x < MAP_WIDTH:
+        out_of_bounds = False
+    else:
+        out_of_bounds = True
     
+    if out_of_bounds: # return here to avoid current map index error
+        print("That's a wall, you can't go that way.")
+        return player['y'], player['x']
+
+    if len(player['backpack_storage']) == player['backpack_capacity'] and current_map[test_y][test_x] in mineral_names.keys():
+        backpack_full = True
+    else:
+        backpack_full = False
+    
+    if current_map[test_y][test_x] in mineral_names.keys():
+        if player['pickaxe_level'] - 1 < minerals.index(mineral_names[current_map[test_y][test_x]]):
+            pickaxe_level_too_low = True
+        else:
+            pickaxe_level_too_low = False
+    else:
+        pickaxe_level_too_low = False
+
+    # determine movement validity
+    if pickaxe_level_too_low:
+        print('Your pickaxe is not good enough to mine {}.'.format(mineral_names[current_map[test_y][test_x]]))
+        return player['y'], player['x']
+    elif backpack_full:
+        print("You can't carry any more, so you can't go that way.")
+        return player['y'], player['x']
+    else:
+        return test_y, test_x
+
+# handles using portal stone
+def portal_stone(player, current_map):
+    player['portal_y'] = player['y']
+    player['portal_x'] = player['x']
+    current_map[player['portal_y']][player['portal_x']] == 'P'
+    print('You place your portal stone here and zap back to town.')
+    # TODO: selling?
+
+# Manages all mine related code
+def mine(game_map, fog, current_map, player):
+
+    player['turns'] = TURNS_PER_DAY
+    print('---------------------------------------------------')
+    print('{:^51}'.format('DAY ' + str(player['day'])))
+    print('---------------------------------------------------')
+    valid = ['m', 'i', 'p', 'q']
+    valid.extend(movement_buttons)
+
+    while True:
+        show_mine_menu(current_map, player)
+        
+        player_action = prompt(valid, "Action? ")
+        if player_action in movement_buttons:
+            player['y'], player['x'] = attempt_move(player_action, player, current_map)
+            node = [player['y'], player['x']]
+            nodes = get_surrounding_nodes(player)
+            clear_fog(fog, nodes)
+            interact_node(current_map, player, node)
+        elif player_action == 'm':
+            mine_map = draw_map(current_map, fog)
+            print(mine_map)
+        elif player_action == 'i':
+            show_information(player)
+        elif player_action == 'p':
+            print()
+            print('-----------------------------------------------------')
+            portal_stone(player, current_map)
+            break
+        else:
+            print('WHAAAT???')
+            print(['m', 'i', 'p', 'q'].extend(movement_buttons))
+            print(player_action in ['m', 'i', 'p', 'q'].extend(movement_buttons))
+            print(len(player_action))
+            break
+
+
+
 # it insists upon itself
 def game(save_file, game_map, fog, current_map, player):
     while True:
@@ -406,6 +516,13 @@ def game(save_file, game_map, fog, current_map, player):
             shop_menu(player)
         elif player_action == 'i':
             show_information(player)
+        elif player_action == 'm':
+            mine_map = draw_map(current_map, fog)
+            print(mine_map)
+        elif player_action == 'e':
+            mine(game_map, fog, current_map, player)
+        elif player_action == 'v':
+            save_game(save_file, game_map, fog, current_map, player)
         else:
             break
 
