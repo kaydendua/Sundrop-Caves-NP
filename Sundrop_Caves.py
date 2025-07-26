@@ -502,7 +502,7 @@ def portal_stone(player, current_map):
     # TODO: selling?
 
 # manages all mine related code
-def mine(game_map, fog, current_map, player):
+def mine(save_file, game_map, fog, current_map, player):
 
     global game_state
 
@@ -556,8 +556,6 @@ def game(save_file, game_map, fog, current_map, player):
         elif game_state == 'main':
             break
 
-    print('i reached the end of game()!')
-
 # manages all town related decisions
 def town(save_file, game_map, fog, current_map, player):
 
@@ -572,8 +570,9 @@ def town(save_file, game_map, fog, current_map, player):
             show_information(player)
         elif player_action == 'm':
             mine_map = draw_map(current_map, fog)
+            print(mine_map)
         elif player_action == 'e':
-            mine(game_map, fog, current_map, player)
+            mine(save_file, game_map, fog, current_map, player)
         elif player_action == 'v':
             save_game(save_file, game_map, fog, current_map, player)
         else:
