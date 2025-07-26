@@ -568,7 +568,6 @@ def interact_node(current_map, player, node_coords):
 
     if node in mineral_names.keys():
         current_map[node_coords[0]][node_coords[1]] = ' '
-        assert game_map != current_map
         amount_mined = mine_ore(node)
         print('You mined {} piece(s) of {}.'.format(amount_mined, mineral_names[node]))
 
@@ -582,7 +581,8 @@ def interact_node(current_map, player, node_coords):
     elif node == 'T' or node == 'P':
         if prompt(['y','n'], "Would you like to return to town? [Y/N]:") == 'y':
             return_to_town(player)
-            
+
+    player['steps'] += 1        
     player['turns'] -= 1
     if player['turns'] == 0:
         print("You are exhausted.")
@@ -621,12 +621,12 @@ def attempt_move(player_action, player, current_map):
     # determine movement validity
     if pickaxe_level_too_low:
         print('Your pickaxe is not good enough to mine {}.'.format(mineral_names[current_map[test_y][test_x]]))
-        return player['y'], player['x']
+        return player['y'], player['x'], False
     elif backpack_full:
         print("You can't carry any more, so you can't go that way.")
-        return player['y'], player['x']
+        return player['y'], player['x'], False
     else:
-        return test_y, test_x
+        return test_y, test_x, True
 
 # handles selling and new day
 def return_to_town(player):
@@ -650,11 +650,12 @@ def return_to_town(player):
         elif item == 'S':
             silver_sold += 1
         elif item == 'G':
-            gold_sold
+            gold_sold += 1
         # add more ores?
         else:
             print(item)
     
+    earned = 0
     if copper_sold:
         earned = copper_sold * copper_price
         print("You sell {} copper ore for {} GP.".format(copper_sold, earned))
@@ -670,12 +671,21 @@ def return_to_town(player):
     if earned:
         print("You now have {} GP!".format(player['GP']))
     
-    player['day'] += 1
-    player['turns'] = TURNS_PER_DAY
+    if player['GP'] >= WIN_GP:
+        print('-------------------------------------------------------------')
+        print('Woo-hoo! Well done, {}, you have {} GP! '.format(player['name'], player['GP']))
+        print('You now have enough to retire and play video games every day.')
+        print('And it only took you {} days and {} steps! You win!'.format(player['days'], player['steps']))
+        print('-------------------------------------------------------------')
+        game_state = 'main'
+    else:
+        player['day'] += 1
+        player['turns'] = TURNS_PER_DAY
              
 
 # handles using portal stone
 def portal_stone(player, current_map):
+    current_map[player['portal_y']][player['portal_x']] = ' '
     player['portal_y'] = player['y']
     player['portal_x'] = player['x']
     current_map[player['portal_y']][player['portal_x']] = 'P'
@@ -702,11 +712,12 @@ def mine(save_file, game_map, fog, current_map, player):
         
         player_action = prompt(valid, "Action? ")
         if player_action in movement_buttons:
-            player['y'], player['x'] = attempt_move(player_action, player, current_map)
-            node = [player['y'], player['x']]
-            nodes = get_surrounding_nodes(player)
-            clear_fog(fog, nodes)
-            interact_node(current_map, player, node)
+            player['y'], player['x'], successful_move = attempt_move(player_action, player, current_map)
+            if successful_move:
+                node = [player['y'], player['x']]
+                nodes = get_surrounding_nodes(player)
+                clear_fog(fog, nodes)
+                interact_node(current_map, player, node)
         elif player_action == 'm':
             mine_map = draw_map(current_map, fog)
             print(mine_map)
