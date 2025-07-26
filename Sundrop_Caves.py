@@ -154,7 +154,7 @@ def generate_map(map_width, map_height, spread, min_density, max_density):
                         continue
 
                     elif distance_from('T', [row, node], map_struct) < 0.15 * max_distance:
-                        if randint(1,3) == 1:
+                        if randint(1,2) == 1:
                             # cannot put ores too close together
                             if distance_from(' T', [row, node], map_struct, True) > spread:
                                 map_struct[row][node] = 'C'
@@ -214,18 +214,30 @@ def create_fog(fog):
     for y in range(MAP_HEIGHT):
         fog_row = []
         for x in range(MAP_WIDTH):
-            fog_row.append('?')
+            if y <= 1 and x <= 1: # clear out fog surrounding town
+                fog_row.append(' ')
+            else:
+                fog_row.append('?')
         fog.append(fog_row)
 
 def initialize_game(save_file, game_map, fog, current_map, player):
 
     global game_state
-    
+    global MAP_HEIGHT
+    global MAP_WIDTH
+
     game_state = 'town'
+    MAP_HEIGHT = 10
+    MAP_WIDTH = 31
 
     # initialize map
-    load_map(generate_map(31, 10, 4, 0.33, 0.5), 0, 10, game_map)
-    current_map.extend(game_map)
+    game_map.clear()
+    current_map.clear()
+
+    game_map.extend(generate_map(MAP_WIDTH, MAP_HEIGHT, 4, 0.33, 0.5))
+
+    # copies game map row by row to make 2 seperate maps that will not affect each other
+    current_map.extend([row[:] for row in game_map]) 
 
     # initialize fog
     create_fog(fog)
@@ -257,19 +269,22 @@ def initialize_game(save_file, game_map, fog, current_map, player):
     player['portal_x'] = 0
     player['portal_y'] = 0
     player['backpack_storage'] = []
-
+    
     save_game(save_file, game_map, fog, current_map, player)
-
-    return game_map, current_map, fog, player
     
 # This function draws the entire map, covered by the fog
 def draw_map(current_map, fog):
-    map_view = '+' + '-' * MAP_WIDTH + '+\n'
 
+    global game_state
+
+    map_view = '+' + '-' * MAP_WIDTH + '+\n'
+    
     for row in range(MAP_HEIGHT):
         map_row = []
         for node in range(MAP_WIDTH):
-            if fog[row][node] == '?':
+            if [row, node] == [0, 0] and game_state == 'town':
+                map_row.append('M')
+            elif fog[row][node] == '?':
                 map_row.append('?')
             elif player['y'] == row and player['x'] == node and game_state == 'mine':
                 map_row.append('M')
@@ -295,11 +310,7 @@ def clear_fog(fog, nodes):
         row = node[0]
         col = node[1]
         if 0 <= row < MAP_HEIGHT and 0 <= col < MAP_WIDTH:
-            try:
-                fog[row][col] = ' '
-            except IndexError:
-                print(node)
-                print(fog)
+            fog[row][col] = ' '
 
 # This function draws the 3x3 viewport
 def draw_view(current_map, player, nodes, view_padding):
@@ -313,7 +324,13 @@ def draw_view(current_map, player, nodes, view_padding):
         if node == [player['y'], player['x']]:
             view += 'M'
         elif -1 < row < MAP_HEIGHT and -1 < col < MAP_WIDTH: # In bounds
-            view += current_map[row][col]
+            try:
+                view += current_map[row][col]
+            except:
+                print(row, col)
+                print(game_map)
+                print(current_map)
+                quit()
         elif ((row == -1  or row == MAP_HEIGHT) and -1 <= col <= MAP_WIDTH) or ((col == -1 or col == MAP_WIDTH) and -1 <= row <= MAP_HEIGHT): # Border
             view += '#'
         else: # Out of bounds
@@ -548,19 +565,29 @@ def mine_ore(ore):
 # determines what happens when a player steps on a node
 def interact_node(current_map, player, node_coords):
     node = current_map[node_coords[0]][node_coords[1]]
+
     if node in mineral_names.keys():
         current_map[node_coords[0]][node_coords[1]] = ' '
+        assert game_map != current_map
         amount_mined = mine_ore(node)
         print('You mined {} piece(s) of {}.'.format(amount_mined, mineral_names[node]))
+
         for pieces in range(amount_mined):
             player['backpack_storage'].append(node)
             if len(player['backpack_storage']) > player['backpack_capacity']:
                 player['backpack_storage'].pop(0)
                 print('...but you can only carry {} more piece(s)!'.format(pieces))
                 break
-    elif node == 'T':
-        pass # TODO return back to town
 
+    elif node == 'T' or node == 'P':
+        if prompt(['y','n'], "Would you like to return to town? [Y/N]:") == 'y':
+            return_to_town(player)
+            
+    player['turns'] -= 1
+    if player['turns'] == 0:
+        print("You are exhausted.")
+        portal_stone(player, current_map)
+ 
 # handles player movement
 def attempt_move(player_action, player, current_map):
     print()
@@ -601,13 +628,59 @@ def attempt_move(player_action, player, current_map):
     else:
         return test_y, test_x
 
+# handles selling and new day
+def return_to_town(player):
+
+    global game_state
+
+    game_state = 'town'
+
+    copper_price = randint(prices['copper'][0], prices['copper'][1])
+    silver_price = randint(prices['silver'][0], prices['silver'][1])
+    gold_price = randint(prices['gold'][0], prices['gold'][1])
+
+    copper_sold = 0
+    silver_sold = 0
+    gold_sold = 0
+    
+    for item in range(len(player['backpack_storage'])):
+        item = player['backpack_storage'].pop(0)
+        if item == 'C':
+            copper_sold += 1
+        elif item == 'S':
+            silver_sold += 1
+        elif item == 'G':
+            gold_sold
+        # add more ores?
+        else:
+            print(item)
+    
+    if copper_sold:
+        earned = copper_sold * copper_price
+        print("You sell {} copper ore for {} GP.".format(copper_sold, earned))
+        player['GP'] += earned
+    if silver_sold:
+        earned = silver_sold * silver_price
+        print("You sell {} silver ore for {} GP.".format(silver_sold, earned))
+        player['GP'] += earned
+    if gold_sold:
+        earned = gold_sold * gold_price
+        print("You sell {} gold ore for {} GP.".format(gold_sold, earned))
+        player['GP'] += earned
+    if earned:
+        print("You now have {} GP!".format(player['GP']))
+    
+    player['day'] += 1
+    player['turns'] = TURNS_PER_DAY
+             
+
 # handles using portal stone
 def portal_stone(player, current_map):
     player['portal_y'] = player['y']
     player['portal_x'] = player['x']
-    current_map[player['portal_y']][player['portal_x']] == 'P'
+    current_map[player['portal_y']][player['portal_x']] = 'P'
     print('You place your portal stone here and zap back to town.')
-    # TODO: selling?
+    return_to_town(player)
 
 # manages all mine related code
 def mine(save_file, game_map, fog, current_map, player):
@@ -617,6 +690,7 @@ def mine(save_file, game_map, fog, current_map, player):
     game_state = 'mine'
 
     player['turns'] = TURNS_PER_DAY
+    print()
     print('---------------------------------------------------')
     print('{:^51}'.format('DAY ' + str(player['day'])))
     print('---------------------------------------------------')
@@ -642,13 +716,13 @@ def mine(save_file, game_map, fog, current_map, player):
             print()
             print('-----------------------------------------------------')
             portal_stone(player, current_map)
-            game_state = 'town'
-            break
         else:
             save_or_not = prompt(['y','n'],"Would you like to save before quitting? Unsaved data will be lost otherwise. [Y/N]: ")
             if save_or_not == 'y':
                 save_game(save_file, game_map, fog, current_map, player)
             game_state = 'main'
+
+        if game_state != 'mine':
             break
 
 # it insists upon itself
