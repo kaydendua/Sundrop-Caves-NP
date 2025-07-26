@@ -675,7 +675,7 @@ def return_to_town(player):
         print('-------------------------------------------------------------')
         print('Woo-hoo! Well done, {}, you have {} GP! '.format(player['name'], player['GP']))
         print('You now have enough to retire and play video games every day.')
-        print('And it only took you {} days and {} steps! You win!'.format(player['days'], player['steps']))
+        print('And it only took you {} days and {} steps! You win!'.format(player['day'], player['steps']))
         print('-------------------------------------------------------------')
         game_state = 'main'
     else:
