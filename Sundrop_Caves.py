@@ -83,17 +83,15 @@ def load_map(save_data, start_read, end_read, game_map):
     MAP_WIDTH = len(game_map[0])
     MAP_HEIGHT = len(game_map)
 
-# This function retrieves the map from the level1.txt file. It will be replaced with a map generator.
-def get_map():
+# This function retrieves the map from a file. 
+# While it is not used in the code currently, as there is a map generator in place,
+# The code can be edited slightly to get a specific map from a file.
+def get_map(filename):
     map_data = []
-    with open('level1.txt', 'r') as map_file:
+    with open(filename, 'r') as map_file:
         for line in map_file:
             map_data.append(line)
     return map_data
-
-# Calculates Euclidean distance from a node to specific node types or coordinates
-
-
 
 # checks how far one node is from certain nodes or node types
 # searchfor can be the y and x coordinates of a specific node or a string of node types
@@ -120,7 +118,7 @@ def distance_from(searchfor, node, map_struct, avoid=False):
             if distance is None or d < distance:
                 distance = d
     if distance == None:
-        return 100000000 # not found will return very far away
+        return 100000000 # not found will return as very far away
     else:
         return distance 
 
@@ -131,77 +129,81 @@ def neighbour_nodes(map_struct, node, checkfor):
     for row in range(node[0] - 1, node[0] + 2):
         for col in range(node[1] - 1, node[1] + 2):
             if row < len(map_struct) and col < len(map_struct[0]): # dodge index error
-                if map_struct[row][col] in checkfor:
+                if map_struct[row][col] in checkfor and [row, col] != node:
                     nodes.append(map_struct[row][col])
     return nodes
 
 
-def generate_map(map_width, map_height, spread, density): # 31, 10
-    map_struct = [[' ' for x in range(map_width)] for y in range(map_height)]
-    map_struct[0][0] = 'T'
-    max_distance = distance_from('T', [map_height - 1, map_width - 1], map_struct)
-
-    # random map generation logic is based off neighbouring nodes
-    # i.e if a node is surrounded by many copper nodes, it is likely to become a copper node itself
-    # the first iteration over the map will place various ores to start this process
-    # and then the rest of the map will be populated based off those starting nodes
-    
-    # first iteration to go place "seed" nodes
-    for row in range(map_height):
-        for node in range(map_width):
-            if map_struct[row][node] == ' ':
-                # beginner area shall only contain copper, also immediate surrounding area from T is empty
-                if distance_from('T', [row, node], map_struct) <= 1.5:
-                    continue
-
-                elif distance_from('T', [row, node], map_struct) < 0.15 * max_distance:
-                    if randint(1,3) == 1:
-                        # cannot put ores too close together
-                        if distance_from(' T', [row, node], map_struct, True) > spread:
-                            map_struct[row][node] = 'C'
-                
-                # main area will contain all ores
-                elif distance_from('T', [row, node], map_struct) < 0.90 * max_distance:
-                    chance = randint(1,16)
-                    if chance == 1:
-                        if distance_from(' ', [row, node], map_struct, True) > spread:
-                            map_struct[row][node] = 'C'
-                    elif chance <= 3:
-                        if distance_from(' ', [row, node], map_struct, True) > spread:
-                            map_struct[row][node] = 'S'
-                    elif chance == 4:
-                        if distance_from(' ', [row, node], map_struct, True) > spread:
-                            map_struct[row][node] = 'G'
-                
-                # farthest corner will contain gold
-                else:
-                    if randint(1,3) == 1:
-                        if distance_from(' ', [row, node], map_struct, True) > spread:
-                            map_struct[row][node] = 'G'
-
-    # populate map to desired density
-    # NOTE: this algorithm is likely to overshoot the desired density, as once there are enough ores
-    # the rate of ore placement speeds up very quickly, i.e. a density of 0.33 is likely to result in maps that are 50% filled
-    # so put in a lower density value than desired.
-
+def generate_map(map_width, map_height, spread, min_density, max_density): 
     while True:
+        map_struct = [[' ' for x in range(map_width)] for y in range(map_height)]
+        map_struct[0][0] = 'T'
+        max_distance = distance_from('T', [map_height - 1, map_width - 1], map_struct)
+
+        # random map generation logic is based off neighbouring nodes
+        # i.e if a node is surrounded by many copper nodes, it is likely to become a copper node itself
+        # the first iteration over the map will place various ores to start this process
+        # and then the rest of the map will be populated based off those starting nodes
+        
+        # first iteration to go place "seed" nodes
         for row in range(map_height):
-            for col in range(map_width):
-                if map_struct[row][col] == ' ':
-                    if distance_from('T', [row, col], map_struct) <= 1.5:
+            for node in range(map_width):
+                if map_struct[row][node] == ' ':
+                    # beginner area shall only contain copper, also immediate surrounding area from T is empty
+                    if distance_from('T', [row, node], map_struct) <= 1.5:
                         continue
-                    nearby_nodes = neighbour_nodes(map_struct, [row, col], ' CSG')
-                    if nearby_nodes:
-                        chosen = randint(0, len(nearby_nodes) - 1)
-                        map_struct[row][col] = nearby_nodes[chosen]
 
-        ore_count = 0
-        for row in range(map_height):
-            for col in range(map_width):
-                if map_struct[row][col] in 'CSG':
-                    ore_count += 1
+                    elif distance_from('T', [row, node], map_struct) < 0.15 * max_distance:
+                        if randint(1,3) == 1:
+                            # cannot put ores too close together
+                            if distance_from(' T', [row, node], map_struct, True) > spread:
+                                map_struct[row][node] = 'C'
+                    
+                    # main area will contain all ores
+                    elif distance_from('T', [row, node], map_struct) < 0.90 * max_distance:
+                        chance = randint(1,16)
+                        if chance == 1:
+                            if distance_from(' ', [row, node], map_struct, True) > spread:
+                                map_struct[row][node] = 'C'
+                        elif chance <= 3:
+                            if distance_from(' ', [row, node], map_struct, True) > spread:
+                                map_struct[row][node] = 'S'
+                        elif chance == 4:
+                            if distance_from(' ', [row, node], map_struct, True) > spread:
+                                map_struct[row][node] = 'G'
+                    
+                    # farthest corner will contain gold
+                    else:
+                        if randint(1,3) == 1:
+                            if distance_from(' ', [row, node], map_struct, True) > spread:
+                                map_struct[row][node] = 'G'
 
-        if ore_count > density * map_height * map_width:
+        # populate map to desired density
+        while True:
+            for row in range(map_height):
+                for col in range(map_width):
+                    if map_struct[row][col] == ' ':
+                        if distance_from('T', [row, col], map_struct) <= 1.5:
+                            continue
+                        nearby_nodes = neighbour_nodes(map_struct, [row, col], ' CSG')
+                        if nearby_nodes:
+                            chosen = randint(0, len(nearby_nodes) - 1)
+                            map_struct[row][col] = nearby_nodes[chosen]
+
+            ore_count = 0
+            for row in range(map_height):
+                for col in range(map_width):
+                    if map_struct[row][col] in 'CSG':
+                        ore_count += 1
+
+            if ore_count > min_density * map_height * map_width:
+                break
+
+        # NOTE: this algorithm is likely to overshoot the desired density, as once there are enough ores
+        # the rate of ore placement speeds up very quickly, i.e. a density of 0.33 is likely to result in maps that are 45% filled
+        # therefore, a maximum density check is in place to prevent a map that is too full of ores.
+
+        if ore_count < max_density * map_height * map_width:
             break
 
     return(map_struct)
@@ -222,7 +224,7 @@ def initialize_game(save_file, game_map, fog, current_map, player):
     game_state = 'town'
 
     # initialize map
-    load_map(get_map(), 0, 10, game_map)
+    load_map(generate_map(31, 10, 4, 0.33, 0.5), 0, 10, game_map)
     current_map.extend(game_map)
 
     # initialize fog
@@ -715,14 +717,6 @@ def main_menu(game_map, fog, current_map, player):
             if 'q' in save_file:
                 continue
             initialize_game(save_file, game_map, fog, current_map, player)
-            while True:
-                test_map = generate_map(31, 10, 4, 0.33)
-                print(draw_map(test_map, [[' ' for x in range(MAP_WIDTH)] for y in range(MAP_HEIGHT)]))
-
-                if prompt() == 'n':
-                    break
-            # print(distance_from('T', [30, 9], game_map))
-            # print(MAP_WIDTH, MAP_HEIGHT)
             game(save_file, game_map, fog, current_map, player) 
         elif main_menu_choice == 'l':
             save_file = choose_save_slot(False)
