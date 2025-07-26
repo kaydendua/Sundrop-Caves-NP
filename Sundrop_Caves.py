@@ -110,6 +110,11 @@ def create_fog(fog):
         fog.append(fog_row)
 
 def initialize_game(save_file, game_map, fog, current_map, player):
+
+    global game_state
+    
+    game_state = 'town'
+
     # initialize map
     load_map(get_map(), 0, 10, game_map)
     current_map.extend(game_map)
@@ -239,6 +244,7 @@ def save_file_details(save_file):
     save_file_info = [] 
     try: 
         with open(save_file, 'r') as save:
+            save.readline()
             save_file_info.append(save.readline().strip().split(',')[1]) # get name
             save_file_info.append('DAY ' + save.readline().strip().split(',')[1])
             save_file_info.append('GP: ' + save.readline().strip().split(',')[1])
@@ -280,25 +286,29 @@ def choose_save_slot(saving=True):
 # This function saves the game
 def save_game(save_file, game_map, fog, current_map, player):
 
+    global game_state
+
     save_data = []
 
+    save_data.append(game_state)
+    
     # save player 
     # saves key alongside value for flexibility
     for key in player:
         save_data.append('{},{}'.format(key, player[key]))
 
     # padding
-    save_data.append('\n' * ((50 - len(save_data)) - 1))
+    save_data.append('\n' * ((51 - len(save_data)) - 1))
 
     # save game map
     for row in game_map:
-        save_data.append('\n'.join(row))
+        save_data.append(''.join(row))
     # save fog
     for row in fog:
-        save_data.append('\n'.join(row))
+        save_data.append(''.join(row))
     # save current map
     for row in current_map:
-        save_data.append('\n'.join(row))
+        save_data.append(''.join(row))
     
     with open(save_file, 'w') as save_file:        
         save_file.write('\n'.join(save_data))
@@ -308,8 +318,13 @@ def save_game(save_file, game_map, fog, current_map, player):
 def load_game(save_file, game_map, fog, current_map, player):
     save_file = open(save_file, 'r')
     save_data = save_file.read().split('\n')
+
+    global game_state
+
+    game_state = save_data[0]
+
     # load player
-    for line in range(0,50):
+    for line in range(1,51):
         if save_data[line]:
             info = save_data[line].split(',', 1)
             if info[1].isdigit():
@@ -325,13 +340,13 @@ def load_game(save_file, game_map, fog, current_map, player):
             break
 
     # load game map
-    load_map(save_data, 50, 60, game_map)
+    load_map(save_data, 51, 61, game_map)
             
     # load fog
-    text_to_list(save_data, 60, 70,fog, FOG_NODES)
+    text_to_list(save_data, 61, 71,fog, FOG_NODES)
 
     # load current map
-    text_to_list(save_data, 70, 80, current_map, MAP_NODES)
+    text_to_list(save_data, 71, 81, current_map, MAP_NODES)
 
     try:
         error_detect = 'Missing player data.'
@@ -486,8 +501,12 @@ def portal_stone(player, current_map):
     print('You place your portal stone here and zap back to town.')
     # TODO: selling?
 
-# Manages all mine related code
+# manages all mine related code
 def mine(game_map, fog, current_map, player):
+
+    global game_state
+
+    game_state = 'mine'
 
     player['turns'] = TURNS_PER_DAY
     print('---------------------------------------------------')
@@ -515,12 +534,35 @@ def mine(game_map, fog, current_map, player):
             print()
             print('-----------------------------------------------------')
             portal_stone(player, current_map)
+            game_state = 'town'
             break
         else:
+            save_or_not = prompt(['y','n'],"Would you like to save before quitting? Unsaved data will be lost otherwise. [Y/N]:")
+            if save_or_not == 'y':
+                save_game(save_file, game_map, fog, current_map, player)
+            game_state = 'main'
             break
 
 # it insists upon itself
 def game(save_file, game_map, fog, current_map, player):
+
+    global game_state
+
+    while True:
+        if game_state == 'town':
+            town(save_file, game_map, fog, current_map, player)
+        elif game_state == 'mine':
+            mine(game_map, fog, current_map, player)
+        elif game_state == 'main':
+            break
+
+    print('i reached the end of game()!')
+
+# manages all town related decisions
+def town(save_file, game_map, fog, current_map, player):
+
+    global game_state
+    
     while True:
         show_town_menu()
         player_action = prompt(['b','i','m','e','v','q'])
@@ -530,12 +572,18 @@ def game(save_file, game_map, fog, current_map, player):
             show_information(player)
         elif player_action == 'm':
             mine_map = draw_map(current_map, fog)
-            print(mine_map)
         elif player_action == 'e':
             mine(game_map, fog, current_map, player)
         elif player_action == 'v':
             save_game(save_file, game_map, fog, current_map, player)
         else:
+            save_or_not = prompt(['y','n'],"Would you like to save before quitting? Unsaved data will be lost otherwise. [Y/N]:")
+            if save_or_not == 'y':
+                save_game(save_file, game_map, fog, current_map, player)
+            game_state = 'main'
+            break
+            
+        if game_state == 'main':
             break
 
 # Display main menu
@@ -550,6 +598,9 @@ def show_main_menu():
 
 # Manage main menu navigation
 def main_menu(game_map, fog, current_map, player):
+
+    global game_state
+
     while True:
         show_main_menu()
         main_menu_choice = prompt(['n','l','q'])
