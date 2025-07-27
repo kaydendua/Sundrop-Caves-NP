@@ -2,6 +2,26 @@ from random import randint
 
 # it deeply upsets me that i cannot use classes
 
+# TODO:
+# high score leaderboard
+# replenishing nodes
+# show inventory
+# warehouse and selling 
+# random events
+# travelling merchant (appears every 5 days, has 3 random items)
+#   magic torch
+#   super torch (unlocked after magic torch)
+#   steel blade
+#   special key (dragon)
+#   ore package (random amount of ores sold at minimum price)
+#   miner's watch (replenish all nodes)
+#   hard hat (less random events)
+#   four-leaf clover (more random events)
+#   red vial (burns enemies, heals player)
+#
+# 2nd mine and bossfight
+
+
 player = {}
 game_map = []
 current_map = []
@@ -10,6 +30,7 @@ fog = []
 MAX_SAVE_SLOTS = 5
 
 PLAYER_DICT_SIZE = 16
+PLAYER_DATA_LINES = 50
 MAP_NODES = ['T', 'C', 'S', 'G', 'P']
 FOG_NODES = ['?']
 
@@ -86,12 +107,12 @@ def load_map(save_data, start_read, end_read, game_map):
 # This function retrieves the map from a file. 
 # While it is not used in the code currently, as there is a map generator in place,
 # The code can be edited slightly to get a specific map from a file.
-def get_map(filename):
-    map_data = []
-    with open(filename, 'r') as map_file:
-        for line in map_file:
-            map_data.append(line)
-    return map_data
+# def get_map(filename):
+#     map_data = []
+#     with open(filename, 'r') as map_file:
+#         for line in map_file:
+#             map_data.append(line)
+#     return map_data
 
 # checks how far one node is from certain nodes or node types
 # searchfor can be the y and x coordinates of a specific node or a string of node types
@@ -144,6 +165,7 @@ def generate_map(map_width, map_height, spread, min_density, max_density):
         # i.e if a node is surrounded by many copper nodes, it is likely to become a copper node itself
         # the first iteration over the map will place various ores to start this process
         # and then the rest of the map will be populated based off those starting nodes
+        # this strategy allows clusters of ores to form, similarly to the provided map
         
         # first iteration to go place "seed" nodes
         for row in range(map_height):
@@ -177,7 +199,8 @@ def generate_map(map_width, map_height, spread, min_density, max_density):
                         if randint(1,3) == 1:
                             if distance_from(' ', [row, node], map_struct, True) > spread:
                                 map_struct[row][node] = 'G'
-
+        
+        # place more ore nodes sprouting off the "seed" nodes
         # populate map to desired density
         while True:
             for row in range(map_height):
@@ -186,15 +209,26 @@ def generate_map(map_width, map_height, spread, min_density, max_density):
                         if distance_from('T', [row, col], map_struct) <= 1.5:
                             continue
                         nearby_nodes = neighbour_nodes(map_struct, [row, col], ' CSG')
-                        if nearby_nodes:
+                        if nearby_nodes: # just in case
+                            # node becomes a random node from its 8 surrounding nodes 
                             chosen = randint(0, len(nearby_nodes) - 1)
                             map_struct[row][col] = nearby_nodes[chosen]
 
             ore_count = 0
+            copper_count = 0
+            silver_count = 0
+            gold_count = 0
             for row in range(map_height):
                 for col in range(map_width):
-                    if map_struct[row][col] in 'CSG':
+                    ore = map_struct[row][col]
+                    if ore in 'CSG':
                         ore_count += 1
+                        if ore == 'C':
+                            copper_count += 1
+                        elif ore == 'S':
+                            silver_count += 1
+                        else:
+                            gold_count += 1
 
             if ore_count > min_density * map_height * map_width:
                 break
@@ -204,9 +238,10 @@ def generate_map(map_width, map_height, spread, min_density, max_density):
         # therefore, a maximum density check is in place to prevent a map that is too full of ores.
 
         if ore_count < max_density * map_height * map_width:
-            break
+            if copper_count >= 15 and silver_count >= 10 and gold_count >= 10: # ensure sufficient ore for the player
+                break
 
-    return(map_struct)
+    return map_struct
 
 # Creates a new fog map
 def create_fog(fog):
@@ -284,10 +319,10 @@ def draw_map(current_map, fog):
         for node in range(MAP_WIDTH):
             if [row, node] == [0, 0] and game_state == 'town':
                 map_row.append('M')
-            elif fog[row][node] == '?':
-                map_row.append('?')
             elif player['y'] == row and player['x'] == node and game_state == 'mine':
                 map_row.append('M')
+            elif fog[row][node] == '?':
+                map_row.append('?')
             else:
                 map_row.append(current_map[row][node])
         map_view += '|' + ''.join(map_row) + '|\n'
@@ -423,7 +458,7 @@ def save_game(save_file, game_map, fog, current_map, player):
         save_data.append('{},{}'.format(key, player[key]))
 
     # padding
-    save_data.append('\n' * ((51 - len(save_data)) - 1))
+    save_data.append('\n' * (((1 + PLAYER_DATA_LINES) - len(save_data)) - 1))
 
     # save game map
     for row in game_map:
@@ -438,7 +473,17 @@ def save_game(save_file, game_map, fog, current_map, player):
     with open(save_file, 'w') as save_file:        
         save_file.write('\n'.join(save_data))
     print('Game saved.')
-        
+
+# saves winning runs to a global save file
+def global_save():
+    # TODO: high score save file
+    pass
+
+# displays the top scores
+def show_high_scores():
+    # TODO: display high scores
+    pass
+
 # This function loads the game
 def load_game(save_file, game_map, fog, current_map, player):
     save_file = open(save_file, 'r')
@@ -449,7 +494,7 @@ def load_game(save_file, game_map, fog, current_map, player):
     game_state = save_data[0]
 
     # load player
-    for line in range(1,51):
+    for line in range(1, PLAYER_DATA_LINES + 1):
         if save_data[line]:
             info = save_data[line].split(',', 1)
             if info[1].isdigit():
@@ -465,13 +510,13 @@ def load_game(save_file, game_map, fog, current_map, player):
             break
 
     # load game map
-    load_map(save_data, 51, 61, game_map)
+    load_map(save_data, PLAYER_DATA_LINES + 1, PLAYER_DATA_LINES + 11, game_map)
             
     # load fog
-    text_to_list(save_data, 61, 71,fog, FOG_NODES)
+    text_to_list(save_data, PLAYER_DATA_LINES + 11, PLAYER_DATA_LINES + 21,fog, FOG_NODES)
 
     # load current map
-    text_to_list(save_data, 71, 81, current_map, MAP_NODES)
+    text_to_list(save_data, PLAYER_DATA_LINES + 21, PLAYER_DATA_LINES + 31, current_map, MAP_NODES)
 
     try:
         error_detect = 'Missing player data.'
@@ -484,6 +529,8 @@ def load_game(save_file, game_map, fog, current_map, player):
     except AssertionError:
         print("Error in save data.", error_detect)
         quit()
+
+
 
 # Display town menu
 def show_town_menu():
@@ -672,16 +719,21 @@ def return_to_town(player):
         print("You now have {} GP!".format(player['GP']))
     
     if player['GP'] >= WIN_GP:
-        print('-------------------------------------------------------------')
-        print('Woo-hoo! Well done, {}, you have {} GP! '.format(player['name'], player['GP']))
-        print('You now have enough to retire and play video games every day.')
-        print('And it only took you {} days and {} steps! You win!'.format(player['day'], player['steps']))
-        print('-------------------------------------------------------------')
-        game_state = 'main'
+        win_game(player)
     else:
         player['day'] += 1
         player['turns'] = TURNS_PER_DAY
-             
+
+def win_game(player):
+
+    global game_state
+
+    print('-------------------------------------------------------------')
+    print('Woo-hoo! Well done, {}, you have {} GP! '.format(player['name'], player['GP']))
+    print('You now have enough to retire and play video games every day.')
+    print('And it only took you {} days and {} steps! You win!'.format(player['day'], player['steps']))
+    print('-------------------------------------------------------------')
+    game_state = 'main'
 
 # handles using portal stone
 def portal_stone(player, current_map):
@@ -745,7 +797,7 @@ def game(save_file, game_map, fog, current_map, player):
         if game_state == 'town':
             town(save_file, game_map, fog, current_map, player)
         elif game_state == 'mine':
-            mine(game_map, fog, current_map, player)
+            mine(save_file, game_map, fog, current_map, player)
         elif game_state == 'main':
             break
 
