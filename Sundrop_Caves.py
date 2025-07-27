@@ -476,7 +476,14 @@ def save_game(save_file, game_map, fog, current_map, player):
     print('Game saved.')
 
 def add_high_score(player):
-    global_save = open(GLOBAL_SAVE_FILE, 'r')
+    try:
+        global_save = open(GLOBAL_SAVE_FILE, 'r')
+    except FileNotFoundError:
+        # creates empty global save file
+        global_save = open(GLOBAL_SAVE_FILE, 'w')
+        global_save.close()
+        global_save = open(GLOBAL_SAVE_FILE, 'r')
+        
     data = global_save.read()
     new_score = ','.join([player['name'], str(player['day']), str(player['steps']), str(player['GP'])])
     if data:
@@ -535,6 +542,8 @@ def add_high_score(player):
 
         global_save.write(new_score)
         print('Congratulations! You have a new high score on the leaderboard!')
+
+    global_save.close()
 
 # displays the top scores
 def show_high_scores():
