@@ -43,7 +43,10 @@ WIN_GP = 500
 PICKAXE_MAX_LEVEL = 3
 BACKPACK_UPGRADE_AMOUNT = 2
 
+LEADERBOARD_SIZE = 5
+
 SAVE_FILE_NAME = 'save{}.txt'
+GLOBAL_SAVE_FILE = 'global.txt'
 
 VIEW_PADDING = 1
 
@@ -278,8 +281,6 @@ def initialize_game(save_file, game_map, fog, current_map, player):
     create_fog(fog)
     
     # initialize player
-    #   You will probably add other entries into the player dictionary
-
     # key info
     name = prompt(message="Greetings, miner! What is your name? ")
     if name:
@@ -404,7 +405,7 @@ def save_file_details(save_file):
     save_file_info = [] 
     try: 
         with open(save_file, 'r') as save:
-            save.readline()
+            save.readline() # skip game state
             save_file_info.append(save.readline().strip().split(',')[1]) # get name
             save_file_info.append('DAY ' + save.readline().strip().split(',')[1])
             save_file_info.append('GP: ' + save.readline().strip().split(',')[1])
@@ -474,14 +475,75 @@ def save_game(save_file, game_map, fog, current_map, player):
         save_file.write('\n'.join(save_data))
     print('Game saved.')
 
-# saves winning runs to a global save file
-def global_save():
-    # TODO: high score save file
-    pass
+def add_high_score(player):
+    global_save = open(GLOBAL_SAVE_FILE, 'r')
+    data = global_save.read()
+    new_score = ','.join([player['name'], str(player['day']), str(player['steps']), str(player['GP'])])
+    if data:
+        data = data.split('\n')
+        data.append(new_score)
+
+        # basically just bubble sort
+        for line in range(len(data) - 1, 0,-1):
+            current_info = data[line].split(',')
+            above_info = data[line - 1].split(',')
+
+            # go through the list until there is a score greater than the current one
+            # read backwards to dodge player name inteference
+            # i.e. comma in player name
+            if int(current_info[-3]) < int(above_info[-3]): # sort by days
+                break
+            elif int(current_info[-3]) == int(above_info[-3]):
+                if int(current_info[-2]) < int(above_info[-2]): # sort by steps
+                    break
+                elif int(current_info[-2]) == int(above_info[-2]): 
+                    if int(current_info[-1]) <= int(above_info[-1]): # sort by GP
+                        break
+
+        if line == len(data):
+            new_high_score = True
+        else:
+            new_high_score = False
+        # rewrite data list, but with the appended data in the correct position
+        new_data = []
+        for item in range(line):
+            new_data.append(data[item])
+        
+        new_data.append(data.pop(-1))
+
+        for item in range(line, len(data)):
+            new_data.append(data[item])
+        
+        while len(new_data) > LEADERBOARD_SIZE:
+            new_data.pop(-1)
+
+        global_save.close()
+        global_save = open(GLOBAL_SAVE_FILE, 'w')
+
+        for line in range(len(new_data)):
+            if line == len(new_data) - 1:
+                global_save.write(new_data[line])
+            else:
+                global_save.write(new_data[line] + '\n')
+
+        if new_high_score:
+            print('Congratulations! You have a new high score on the leaderboard!')
+
+    else:
+        global_save.close()
+        global_save = open(GLOBAL_SAVE_FILE, 'w')
+
+        global_save.write(new_score)
+        print('Congratulations! You have a new high score on the leaderboard!')
 
 # displays the top scores
 def show_high_scores():
-    # TODO: display high scores
+    with open(GLOBAL_SAVE_FILE, 'r') as global_save:
+        data = global_save.read().split('\n')
+        if data:
+            pass # TODO: display stats
+        else:
+            print('There are no high scores as you have not won the game yet.')
     pass
 
 # This function loads the game
@@ -718,21 +780,27 @@ def return_to_town(player):
     if earned:
         print("You now have {} GP!".format(player['GP']))
     
-    if player['GP'] >= WIN_GP:
-        win_game(player)
+    if player['GP'] >= WIN_GP:   
+        game_state = "win"
     else:
         player['day'] += 1
         player['turns'] = TURNS_PER_DAY
 
-def win_game(player):
+def win_game(save_file, game_map, fog, current_map, player):
 
     global game_state
 
+    print()
     print('-------------------------------------------------------------')
     print('Woo-hoo! Well done, {}, you have {} GP! '.format(player['name'], player['GP']))
     print('You now have enough to retire and play video games every day.')
     print('And it only took you {} days and {} steps! You win!'.format(player['day'], player['steps']))
     print('-------------------------------------------------------------')
+
+    save_game(save_file, game_map, fog, current_map, player)
+    
+    add_high_score(player)
+
     game_state = 'main'
 
 # handles using portal stone
@@ -800,6 +868,9 @@ def game(save_file, game_map, fog, current_map, player):
             mine(save_file, game_map, fog, current_map, player)
         elif game_state == 'main':
             break
+        elif game_state == 'win':
+            win_game(save_file, game_map, fog, current_map, player)
+            break
 
 # manages all town related decisions
 def town(save_file, game_map, fog, current_map, player):
@@ -827,7 +898,7 @@ def town(save_file, game_map, fog, current_map, player):
             game_state = 'main'
             break
             
-        if game_state == 'main':
+        if game_state != 'town':
             break
 
 # Display main menu
@@ -836,7 +907,7 @@ def show_main_menu():
     print("--- Main Menu ----")
     print("(N)ew game")
     print("(L)oad saved game")
-#    print("(H)igh scores")
+    print("(H)igh scores")
     print("(Q)uit")
     print("------------------")
 
@@ -847,7 +918,7 @@ def main_menu(game_map, fog, current_map, player):
 
     while True:
         show_main_menu()
-        main_menu_choice = prompt(['n','l','q'])
+        main_menu_choice = prompt(['n','l','h','q'])
 
         if main_menu_choice == 'n':
             save_file = choose_save_slot()
