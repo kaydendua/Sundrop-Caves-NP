@@ -313,6 +313,7 @@ def draw_map(current_map, fog):
 
     global game_state
 
+    print()
     map_view = '+' + '-' * MAP_WIDTH + '+\n'
     
     for row in range(MAP_HEIGHT):
@@ -697,7 +698,7 @@ def interact_node(current_map, player, node_coords):
                 break
 
     elif node == 'T' or node == 'P':
-        if prompt(['y','n'], "Would you like to return to town? [Y/N]:") == 'y':
+        if prompt(['y','n'], "Would you like to return to town? [Y/N]: ") == 'y':
             return_to_town(player)
 
     player['steps'] += 1        
@@ -721,7 +722,7 @@ def attempt_move(player_action, player, current_map):
     
     if out_of_bounds: # return here to avoid current map index error
         print("That's a wall, you can't go that way.")
-        return player['y'], player['x']
+        return player['y'], player['x'], False
 
     if len(player['backpack_storage']) == player['backpack_capacity'] and current_map[test_y][test_x] in mineral_names.keys():
         backpack_full = True
@@ -861,7 +862,7 @@ def mine(save_file, game_map, fog, current_map, player):
             if save_or_not == 'y':
                 save_game(save_file, game_map, fog, current_map, player)
             game_state = 'main'
-
+            
         if game_state != 'mine':
             break
 
