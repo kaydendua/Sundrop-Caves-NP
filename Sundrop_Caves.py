@@ -67,6 +67,7 @@ drop_rates['copper'] = (1, 5)
 drop_rates['silver'] = (1, 3)
 drop_rates['gold'] = (1, 2)
 
+
 # This function handles all prompts. It takes in a list of valid inputs and
 # loops until it receives a valid input.
 def prompt(valid=[], message='Your choice? '):      
@@ -80,8 +81,10 @@ def prompt(valid=[], message='Your choice? '):
         else:
             print('"{}" is not a valid input. Please try again.'.format(player_input))
 
+
 # Converts text data to nested list and loads it into a variable (target)
 # Also optionally cleans unwanted data
+# NOTE: supersedes load_fog() function
 def text_to_list(data, start_read, end_read, target, clean=[]):
     target.clear()
     for line in range(start_read, end_read):
@@ -92,6 +95,7 @@ def text_to_list(data, start_read, end_read, target, clean=[]):
             else:
                 row.append(' ')
         target.append(row)
+
 
 # This function converts the map data from the save file into a nested list
 # It also updates MAP_WIDTH and MAP_HEIGHT
@@ -107,6 +111,7 @@ def load_map(save_data, start_read, end_read, game_map):
     MAP_WIDTH = len(game_map[0])
     MAP_HEIGHT = len(game_map)
 
+
 # This function retrieves the map from a file. 
 # While it is not used in the code currently, as there is a map generator in place,
 # The code can be edited slightly to get a specific map from a file.
@@ -116,6 +121,7 @@ def load_map(save_data, start_read, end_read, game_map):
 #         for line in map_file:
 #             map_data.append(line)
 #     return map_data
+
 
 # checks how far one node is from certain nodes or node types
 # searchfor can be the y and x coordinates of a specific node or a string of node types
@@ -145,6 +151,7 @@ def distance_from(searchfor, node, map_struct, avoid=False):
         return 100000000 # not found will return as very far away
     else:
         return distance 
+
 
 # returns an array of the ore types surrounding a node:
 def neighbour_nodes(map_struct, node, checkfor):
@@ -246,6 +253,7 @@ def generate_map(map_width, map_height, spread, min_density, max_density):
 
     return map_struct
 
+
 # Creates a new fog map
 def create_fog(fog):
     fog.clear()
@@ -257,6 +265,7 @@ def create_fog(fog):
             else:
                 fog_row.append('?')
         fog.append(fog_row)
+
 
 def initialize_game(save_file, game_map, fog, current_map, player):
 
@@ -307,7 +316,8 @@ def initialize_game(save_file, game_map, fog, current_map, player):
     player['backpack_storage'] = []
     
     save_game(save_file, game_map, fog, current_map, player)
-    
+
+
 # This function draws the entire map, covered by the fog
 def draw_map(current_map, fog):
 
@@ -334,14 +344,16 @@ def draw_map(current_map, fog):
     map_view += '+' + '-' * MAP_WIDTH + '+'
     return map_view
 
-# This function returns an array of all the nodes surrounding the player
-def get_surrounding_nodes(player):
+
+# This function returns an array of all the nodes coordinates surrounding a center node 
+def get_surrounding_nodes(center, search_area):
     nodes = []
     # check if node is within +-torch_level x AND +-torch_level y
-    for row in range(player['y'] - player['torch_level'], player['y'] + player['torch_level'] + 1):
-        for node in range(player['x'] - player['torch_level'], player['x'] + player['torch_level'] + 1):
+    for row in range(center[0] - search_area, center[0] + search_area + 1):
+        for node in range(center[1] - search_area, center[1] + search_area + 1):
             nodes.append([row, node])
     return nodes
+
 
 # This function clears the fog of war at the 3x3 square around the player
 def clear_fog(fog, nodes):
@@ -350,6 +362,7 @@ def clear_fog(fog, nodes):
         col = node[1]
         if 0 <= row < MAP_HEIGHT and 0 <= col < MAP_WIDTH:
             fog[row][col] = ' '
+
 
 # This function draws the 3x3 viewport
 def draw_view(current_map, player, nodes, view_padding):
@@ -381,6 +394,7 @@ def draw_view(current_map, player, nodes, view_padding):
     view += '+' + '-' * view_size * (view_padding + 1) + '-' * view_padding + '+' 
     return view
 
+
 # This function shows the information for the player
 def show_information(player):
     print()
@@ -396,6 +410,7 @@ def show_information(player):
     print("Steps taken:", player['steps'])
     print("------------------------------")
 
+
 # This function reads key information from a save file for temporary display, 
 # such as the player name, day, gold and steps taken, and returns it as a list of strings to be printed
 def save_file_details(save_file):
@@ -410,7 +425,8 @@ def save_file_details(save_file):
         return save_file_info
     except FileNotFoundError:
         return None
-    
+
+
 # Sundrop Caves has 5 save slots. This function will handle the selection logic.
 def choose_save_slot(saving=True):
     while True:
@@ -440,6 +456,7 @@ def choose_save_slot(saving=True):
             continue
         else:
             return save_file
+
 
 # This function saves the game
 def save_game(save_file, game_map, fog, current_map, player):
@@ -471,6 +488,7 @@ def save_game(save_file, game_map, fog, current_map, player):
     with open(save_file, 'w') as save_file:        
         save_file.write('\n'.join(save_data))
     print('Game saved.')
+
 
 def add_high_score(player):
     try:
@@ -541,6 +559,7 @@ def add_high_score(player):
         print('Congratulations! You have a new high score on the leaderboard!')
 
     global_save.close()
+
 
 # displays the top scores
 def show_high_scores():
@@ -630,7 +649,6 @@ def load_game(save_file, game_map, fog, current_map, player):
         quit()
 
 
-
 # Display town menu
 def show_town_menu():
     print()
@@ -643,6 +661,7 @@ def show_town_menu():
     print("Sa(V)e game")
     print("(Q)uit to main menu")
     print("------------------------")
+
 
 # Display shop menu and calculate prices
 def show_shop_menu():
@@ -668,6 +687,7 @@ def show_shop_menu():
     print('-----------------------------------------------------------')
     return pickaxe_prices[pickaxe_level], backpack_capacity * 2, accepted_inputs
 
+
 # Manages purchasing upgrades
 def shop_menu(player):
     while True:
@@ -692,21 +712,24 @@ def shop_menu(player):
         else:
             break
 
+
 def show_mine_menu(current_map, player):
     print()
     print('DAY', player['day'])
-    nodes = get_surrounding_nodes(player)
+    nodes = get_surrounding_nodes([player['y'], player['x']], player['torch_level'])
     viewport = draw_view(current_map, player, nodes, VIEW_PADDING)
     print(viewport)
     print('Turns left: {:<5} Load: {} / {}    Steps: {}'.format(player['turns'], len(player['backpack_storage']), player['backpack_capacity'], player['steps']))
     print('(WASD) to move')
     print('(M)ap, (I)nformation, (P)ortal, (Q)uit to main menu')
 
+
 # determines the amount of ore again
 def mine_ore(ore):
     ore_name = mineral_names[ore]
     amount_mined = randint(drop_rates[ore_name][0], drop_rates[ore_name][1])
     return amount_mined
+
 
 # determines what happens when a player steps on a node
 def interact_node(current_map, player, node_coords):
@@ -734,6 +757,7 @@ def interact_node(current_map, player, node_coords):
         print("You are exhausted.")
         portal_stone(player, current_map)
  
+
 # handles player movement
 def attempt_move(player_action, player, current_map):
     print()
@@ -773,6 +797,7 @@ def attempt_move(player_action, player, current_map):
         return player['y'], player['x'], False
     else:
         return test_y, test_x, True
+
 
 # handles selling and new day
 def return_to_town(player):
@@ -823,6 +848,7 @@ def return_to_town(player):
         player['day'] += 1
         player['turns'] = TURNS_PER_DAY
 
+
 def win_game(save_file, game_map, fog, current_map, player):
 
     global game_state
@@ -840,6 +866,7 @@ def win_game(save_file, game_map, fog, current_map, player):
 
     game_state = 'main'
 
+
 # handles using portal stone
 def portal_stone(player, current_map):
     if player['portal_y'] != 0 and player['portal_x'] != 0:
@@ -853,12 +880,43 @@ def portal_stone(player, current_map):
         print('You return to town.')
     return_to_town(player)
 
+
+# has a chance to restore mined ores when entering mine
+def replenish_nodes(game_map, current_map):
+    nodes_were_replenished = False
+    for row in range(MAP_HEIGHT):
+        for col in range(MAP_WIDTH):
+            if game_map[row][col] in mineral_names.keys() and current_map[row][col] == ' ':
+                
+                # gets an array of the node types surrounding the node
+                nearby_node_types = []
+                for node in get_surrounding_nodes([row, col], 1):
+                    node_y = node[0]
+                    node_x = node[1]
+                    if 0 <= node_y < MAP_HEIGHT and 0 <= node_x < MAP_WIDTH:
+                        nearby_node_types.append(current_map[node_y][node_x])
+
+                # boosts chance of replenishing to 50% if node is isolated
+                if game_map[row][col] not in nearby_node_types:
+                    chance = 2
+                else:
+                    chance = 5
+                
+                if randint(1, chance) == 1:
+                    current_map[row][col] = game_map[row][col]
+                    nodes_were_replenished = True
+    
+    if nodes_were_replenished:
+        print("Peering into the cave, you notice that a some nodes were replenished!")
+
 # manages all mine related code
 def mine(save_file, game_map, fog, current_map, player):
 
     global game_state
 
     game_state = 'mine'
+
+    replenish_nodes(game_map, current_map)
 
     player['turns'] = TURNS_PER_DAY
     print()
@@ -876,7 +934,7 @@ def mine(save_file, game_map, fog, current_map, player):
             player['y'], player['x'], successful_move = attempt_move(player_action, player, current_map)
             if successful_move:
                 node = [player['y'], player['x']]
-                nodes = get_surrounding_nodes(player)
+                nodes = get_surrounding_nodes([player['y'], player['x']], player['torch_level'])
                 clear_fog(fog, nodes)
                 interact_node(current_map, player, node)
         elif player_action == 'm':
@@ -897,6 +955,7 @@ def mine(save_file, game_map, fog, current_map, player):
         if game_state != 'mine':
             break
 
+
 # it insists upon itself
 def game(save_file, game_map, fog, current_map, player):
 
@@ -912,6 +971,7 @@ def game(save_file, game_map, fog, current_map, player):
         elif game_state == 'win':
             win_game(save_file, game_map, fog, current_map, player)
             break
+
 
 # manages all town related decisions
 def town(save_file, game_map, fog, current_map, player):
@@ -942,6 +1002,7 @@ def town(save_file, game_map, fog, current_map, player):
         if game_state != 'town':
             break
 
+
 # Display main menu
 def show_main_menu():
     print()
@@ -951,6 +1012,7 @@ def show_main_menu():
     print("(H)igh scores")
     print("(Q)uit")
     print("------------------")
+
 
 # Manage main menu navigation
 def main_menu(game_map, fog, current_map, player):
@@ -977,6 +1039,7 @@ def main_menu(game_map, fog, current_map, player):
             show_high_scores()
         else:
             break
+
 
 #--------------------------- MAIN GAME ---------------------------
 game_state = 'main'
