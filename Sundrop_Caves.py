@@ -1,10 +1,9 @@
 from random import randint
+import pytest
 
 # it deeply upsets me that i cannot use classes
 
 # TODO:
-# high score leaderboard
-# replenishing nodes
 # show inventory
 # warehouse and selling 
 # random events
@@ -21,6 +20,7 @@ from random import randint
 #
 # 2nd mine and bossfight
 
+game_state = 'main'
 
 player = {}
 game_map = []
@@ -124,7 +124,7 @@ def load_map(save_data, start_read, end_read, game_map):
 
 
 # checks how far one node is from certain nodes or node types
-# searchfor can be the y and x coordinates of a specific node or a string of node types
+# parameter searchfor can be the y and x coordinates of a specific node or a string of node types
 # there is also avoid mode, which calculates distance from any node not in searchfor
 def distance_from(searchfor, node, map_struct, avoid=False):
     distance = None
@@ -156,15 +156,20 @@ def distance_from(searchfor, node, map_struct, avoid=False):
 # returns an array of the ore types surrounding a node:
 def neighbour_nodes(map_struct, node, checkfor):
     nodes = []
+
     # check if node is within +-1 x AND +-1 y
     for row in range(node[0] - 1, node[0] + 2):
         for col in range(node[1] - 1, node[1] + 2):
             if row < len(map_struct) and col < len(map_struct[0]): # dodge index error
-                if map_struct[row][col] in checkfor and [row, col] != node:
+
+                # check if node is the type that we are searchijng for and is not the center node
+                if map_struct[row][col] in checkfor and [row, col] != node: 
                     nodes.append(map_struct[row][col])
+
     return nodes
 
 
+# randomly generates a new game map given certain parameters
 def generate_map(map_width, map_height, spread, min_density, max_density): 
     while True:
         map_struct = [[' ' for x in range(map_width)] for y in range(map_height)]
@@ -179,36 +184,36 @@ def generate_map(map_width, map_height, spread, min_density, max_density):
         
         # first iteration to go place "seed" nodes
         for row in range(map_height):
-            for node in range(map_width):
-                if map_struct[row][node] == ' ':
+            for col in range(map_width):
+                if map_struct[row][col] == ' ':
                     # beginner area shall only contain copper, also immediate surrounding area from T is empty
-                    if distance_from('T', [row, node], map_struct) <= 1.5:
+                    if distance_from('T', [row, col], map_struct) <= 1.5:
                         continue
 
-                    elif distance_from('T', [row, node], map_struct) < 0.15 * max_distance:
+                    elif distance_from('T', [row, col], map_struct) < 0.15 * max_distance:
                         if randint(1,2) == 1:
                             # cannot put ores too close together
-                            if distance_from(' T', [row, node], map_struct, True) > spread:
-                                map_struct[row][node] = 'C'
+                            if distance_from(' T', [row, col], map_struct, True) > spread:
+                                map_struct[row][col] = 'C'
                     
                     # main area will contain all ores
-                    elif distance_from('T', [row, node], map_struct) < 0.90 * max_distance:
+                    elif distance_from('T', [row, col], map_struct) < 0.90 * max_distance:
                         chance = randint(1,16)
                         if chance == 1:
-                            if distance_from(' ', [row, node], map_struct, True) > spread:
-                                map_struct[row][node] = 'C'
+                            if distance_from(' ', [row, col], map_struct, True) > spread:
+                                map_struct[row][col] = 'C'
                         elif chance <= 3:
-                            if distance_from(' ', [row, node], map_struct, True) > spread:
-                                map_struct[row][node] = 'S'
+                            if distance_from(' ', [row, col], map_struct, True) > spread:
+                                map_struct[row][col] = 'S'
                         elif chance == 4:
-                            if distance_from(' ', [row, node], map_struct, True) > spread:
-                                map_struct[row][node] = 'G'
+                            if distance_from(' ', [row, col], map_struct, True) > spread:
+                                map_struct[row][col] = 'G'
                     
                     # farthest corner will contain gold
                     else:
                         if randint(1,3) == 1:
-                            if distance_from(' ', [row, node], map_struct, True) > spread:
-                                map_struct[row][node] = 'G'
+                            if distance_from(' ', [row, col], map_struct, True) > spread:
+                                map_struct[row][col] = 'G'
         
         # place more ore nodes sprouting off the "seed" nodes
         # populate map to desired density
@@ -254,7 +259,7 @@ def generate_map(map_width, map_height, spread, min_density, max_density):
     return map_struct
 
 
-# Creates a new fog map
+# creates a new fog map
 def create_fog(fog):
     fog.clear()
     for y in range(MAP_HEIGHT):
@@ -267,6 +272,7 @@ def create_fog(fog):
         fog.append(fog_row)
 
 
+# sets up empty save file for new game
 def initialize_game(save_file, game_map, fog, current_map, player):
 
     global game_state
@@ -328,30 +334,30 @@ def draw_map(current_map, fog):
     
     for row in range(MAP_HEIGHT):
         map_row = []
-        for node in range(MAP_WIDTH):
-            if [row, node] == [0, 0] and game_state == 'town':
+        for col in range(MAP_WIDTH):
+            if [row, col] == [0, 0] and game_state == 'town':
                 map_row.append('M')
-            elif player['y'] == row and player['x'] == node and game_state == 'mine':
+            elif player['y'] == row and player['x'] == col and game_state == 'mine':
                 map_row.append('M')
-            elif [row, node] == [0, 0] and game_state != 'town':
+            elif [row, col] == [0, 0] and game_state != 'town':
                 map_row.append('T')
-            elif fog[row][node] == '?':
+            elif fog[row][col] == '?':
                 map_row.append('?')
             else:
-                map_row.append(current_map[row][node])
+                map_row.append(current_map[row][col])
         map_view += '|' + ''.join(map_row) + '|\n'
 
     map_view += '+' + '-' * MAP_WIDTH + '+'
     return map_view
 
 
-# This function returns an array of all the nodes coordinates surrounding a center node 
+# returns an array of all the nodes coordinates surrounding a center nodes, including the center node
 def get_surrounding_nodes(center, search_area):
     nodes = []
-    # check if node is within +-torch_level x AND +-torch_level y
+    # check if center node is within +-search_area x AND +-search_area y
     for row in range(center[0] - search_area, center[0] + search_area + 1):
-        for node in range(center[1] - search_area, center[1] + search_area + 1):
-            nodes.append([row, node])
+        for col in range(center[1] - search_area, center[1] + search_area + 1):
+            nodes.append([row, col])
     return nodes
 
 
@@ -395,7 +401,7 @@ def draw_view(current_map, player, nodes, view_padding):
     return view
 
 
-# This function shows the information for the player
+# displays player information
 def show_information(player):
     print()
     print("----- Player Information -----")
@@ -403,7 +409,7 @@ def show_information(player):
     print("Portal position: ({}, {})".format(player['portal_x'], player['portal_y']))
     print("Pickaxe level: {} ({})".format(player['pickaxe_level'], minerals[player['pickaxe_level'] - 1]))
     print("------------------------------")
-    print(player['backpack_storage'])
+    print(player['backpack_storage']) # TODO: inventory display
     print("Load: {} / {}".format(len(player['backpack_storage']), player['backpack_capacity']))
     print("------------------------------")
     print("GP:", player['GP'])
@@ -458,7 +464,7 @@ def choose_save_slot(saving=True):
             return save_file
 
 
-# This function saves the game
+# saves game data into a save file
 def save_game(save_file, game_map, fog, current_map, player):
 
     global game_state
@@ -490,6 +496,8 @@ def save_game(save_file, game_map, fog, current_map, player):
     print('Game saved.')
 
 
+# attempts to add a score to the high score list
+# if score is a new high score, it will be sorted into the appropriate position
 def add_high_score(player):
     try:
         global_save = open(GLOBAL_SAVE_FILE, 'r')
@@ -602,7 +610,7 @@ def show_high_scores():
             print('There are no high scores as you have not won the game yet.')
 
 
-# This function loads the game
+# loads game data from a save file
 def load_game(save_file, game_map, fog, current_map, player):
     save_file = open(save_file, 'r')
     save_data = save_file.read().split('\n')
@@ -649,7 +657,7 @@ def load_game(save_file, game_map, fog, current_map, player):
         quit()
 
 
-# Display town menu
+# display town menu
 def show_town_menu():
     print()
     print("DAY", player['day'])
@@ -663,7 +671,7 @@ def show_town_menu():
     print("------------------------")
 
 
-# Display shop menu and calculate prices
+# display shop menu and calculate prices
 def show_shop_menu():
     pickaxe_level = player['pickaxe_level']
     backpack_capacity = player['backpack_capacity']
@@ -688,7 +696,7 @@ def show_shop_menu():
     return pickaxe_prices[pickaxe_level], backpack_capacity * 2, accepted_inputs
 
 
-# Manages purchasing upgrades
+# manages purchasing upgrades
 def shop_menu(player):
     while True:
         pickaxe_price, backpack_price, accepted_inputs = show_shop_menu()
@@ -713,6 +721,7 @@ def shop_menu(player):
             break
 
 
+# display the mine menu
 def show_mine_menu(current_map, player):
     print()
     print('DAY', player['day'])
@@ -849,6 +858,7 @@ def return_to_town(player):
         player['turns'] = TURNS_PER_DAY
 
 
+# the script that runs when the game is won
 def win_game(save_file, game_map, fog, current_map, player):
 
     global game_state
@@ -889,12 +899,8 @@ def replenish_nodes(game_map, current_map):
             if game_map[row][col] in mineral_names.keys() and current_map[row][col] == ' ':
                 
                 # gets an array of the node types surrounding the node
-                nearby_node_types = []
-                for node in get_surrounding_nodes([row, col], 1):
-                    node_y = node[0]
-                    node_x = node[1]
-                    if 0 <= node_y < MAP_HEIGHT and 0 <= node_x < MAP_WIDTH:
-                        nearby_node_types.append(current_map[node_y][node_x])
+                # with these parameters, it checks current map for empty spaces or ore nodes
+                nearby_node_types = neighbour_nodes(current_map, [row, col], ' CSG')
 
                 # boosts chance of replenishing to 50% if node is isolated
                 if game_map[row][col] not in nearby_node_types:
@@ -907,7 +913,8 @@ def replenish_nodes(game_map, current_map):
                     nodes_were_replenished = True
     
     if nodes_were_replenished:
-        print("Peering into the cave, you notice that a some nodes were replenished!")
+        print("Peering into the cave, you notice that some nodes were replenished!")
+
 
 # manages all mine related code
 def mine(save_file, game_map, fog, current_map, player):
@@ -956,7 +963,7 @@ def mine(save_file, game_map, fog, current_map, player):
             break
 
 
-# it insists upon itself
+# runs the appropriate function based on game state
 def game(save_file, game_map, fog, current_map, player):
 
     global game_state
@@ -1003,7 +1010,7 @@ def town(save_file, game_map, fog, current_map, player):
             break
 
 
-# Display main menu
+# display main menu
 def show_main_menu():
     print()
     print("--- Main Menu ----")
@@ -1014,7 +1021,7 @@ def show_main_menu():
     print("------------------")
 
 
-# Manage main menu navigation
+# manage main menu navigation
 def main_menu(game_map, fog, current_map, player):
 
     global game_state
@@ -1041,14 +1048,19 @@ def main_menu(game_map, fog, current_map, player):
             break
 
 
-#--------------------------- MAIN GAME ---------------------------
-game_state = 'main'
-print("---------------- Welcome to Sundrop Caves! ----------------")
-print("You spent all your money to get the deed to a mine, a small")
-print("  backpack, a simple pickaxe and a magical portal stone.")
-print()
-print("How quickly can you get the 1000 GP you need to retire")
-print("  and live happily ever after?")
-print("-----------------------------------------------------------")
+def main():
+    print("---------------- Welcome to Sundrop Caves! ----------------")
+    print("You spent all your money to get the deed to a mine, a small")
+    print("  backpack, a simple pickaxe and a magical portal stone.")
+    print()
+    print("How quickly can you get the 1000 GP you need to retire")
+    print("  and live happily ever after?")
+    print("-----------------------------------------------------------")
 
-main_menu(game_map, fog, current_map, player)
+    main_menu(game_map, fog, current_map, player)
+
+
+#--------------------------- MAIN GAME ---------------------------
+if __name__ == "__main__":
+    main()
+
