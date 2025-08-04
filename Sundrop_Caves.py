@@ -323,6 +323,8 @@ def draw_map(current_map, fog):
                 map_row.append('M')
             elif player['y'] == row and player['x'] == node and game_state == 'mine':
                 map_row.append('M')
+            elif [row, node] == [0, 0] and game_state != 'town':
+                map_row.append('T')
             elif fog[row][node] == '?':
                 map_row.append('?')
             else:
@@ -335,7 +337,7 @@ def draw_map(current_map, fog):
 # This function returns an array of all the nodes surrounding the player
 def get_surrounding_nodes(player):
     nodes = []
-    # check if node is within +-1 x AND +-1 y
+    # check if node is within +-torch_level x AND +-torch_level y
     for row in range(player['y'] - player['torch_level'], player['y'] + player['torch_level'] + 1):
         for node in range(player['x'] - player['torch_level'], player['x'] + player['torch_level'] + 1):
             nodes.append([row, node])
@@ -361,13 +363,7 @@ def draw_view(current_map, player, nodes, view_padding):
         if node == [player['y'], player['x']]:
             view += 'M'
         elif -1 < row < MAP_HEIGHT and -1 < col < MAP_WIDTH: # In bounds
-            try:
-                view += current_map[row][col]
-            except:
-                print(row, col)
-                print(game_map)
-                print(current_map)
-                quit()
+            view += current_map[row][col]
         elif ((row == -1  or row == MAP_HEIGHT) and -1 <= col <= MAP_WIDTH) or ((col == -1 or col == MAP_WIDTH) and -1 <= row <= MAP_HEIGHT): # Border
             view += '#'
         else: # Out of bounds
@@ -551,10 +547,41 @@ def show_high_scores():
     with open(GLOBAL_SAVE_FILE, 'r') as global_save:
         data = global_save.read().split('\n')
         if data:
-            pass # TODO: display stats
+            rank = 1
+            print()
+            print("--------------------- HIGH SCORES ---------------------")
+            for high_score in data:
+                high_score = high_score.split(',')
+                name = high_score[0]
+                day = high_score[1]
+                GP = high_score[2]
+                steps = high_score[3]
+                print(" #{} {:>50}".format(rank, 'DAY ' + day))
+
+                if len(name) <= 26:
+                    print(" {:<26} {:>26}".format(name, 'GP: ' + GP))
+                    print(" {:>53}".format('STEPS: ' + steps))
+                elif len(name) <= 52:
+                    print(" {:<26} {:>26}".format(name[:26], 'GP: ' + GP))
+                    print(" {:<26} {:>26}".format(name[26:], 'STEPS: ' + steps))
+                else:
+                    split_name = []
+                    for n in range(int(len(name)/26)):
+                        split_name.append(name[n*26:(n+1)*26])
+                    if len(name) > (n+1) * 26:
+                        split_name.append(name[(n+1)*26:])
+
+                    print(" {:<26} {:>26}".format(split_name.pop(0), 'GP: ' + GP))
+                    print(" {:<26} {:>26}".format(split_name.pop(1), 'STEPS: ' + steps))
+                    
+                    for part in split_name:
+                        print(" {:<26}".format(part))
+
+                print("-------------------------------------------------------")
+                rank += 1
         else:
             print('There are no high scores as you have not won the game yet.')
-    pass
+
 
 # This function loads the game
 def load_game(save_file, game_map, fog, current_map, player):
@@ -815,11 +842,15 @@ def win_game(save_file, game_map, fog, current_map, player):
 
 # handles using portal stone
 def portal_stone(player, current_map):
-    current_map[player['portal_y']][player['portal_x']] = ' '
-    player['portal_y'] = player['y']
-    player['portal_x'] = player['x']
-    current_map[player['portal_y']][player['portal_x']] = 'P'
-    print('You place your portal stone here and zap back to town.')
+    if player['portal_y'] != 0 and player['portal_x'] != 0:
+        current_map[player['portal_y']][player['portal_x']] = ' '
+    if player['y'] != 0 and player['x'] != 0:
+        player['portal_y'] = player['y']
+        player['portal_x'] = player['x']
+        current_map[player['portal_y']][player['portal_x']] = 'P'
+        print('You place your portal stone here and zap back to town.')
+    else:
+        print('You return to town.')
     return_to_town(player)
 
 # manages all mine related code
@@ -862,7 +893,7 @@ def mine(save_file, game_map, fog, current_map, player):
             if save_or_not == 'y':
                 save_game(save_file, game_map, fog, current_map, player)
             game_state = 'main'
-            
+
         if game_state != 'mine':
             break
 
@@ -942,6 +973,8 @@ def main_menu(game_map, fog, current_map, player):
                 continue
             load_game(save_file, game_map, fog, current_map, player)
             game(save_file, game_map, fog, current_map, player)
+        elif main_menu_choice == 'h':
+            show_high_scores()
         else:
             break
 
