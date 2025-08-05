@@ -43,6 +43,7 @@ WIN_GP = 500
 
 PICKAXE_MAX_LEVEL = 3
 BACKPACK_UPGRADE_AMOUNT = 2
+TORCH_MAX_LEVEL = 3
 
 LEADERBOARD_SIZE = 5
 
@@ -71,6 +72,7 @@ drop_rates['gold'] = (1, 2)
 
 # This function handles all prompts. It takes in a list of valid inputs and
 # loops until it receives a valid input.
+# TODO: update to regex
 def prompt(valid=None, message='Your choice? '):      
     while True:
         player_input = input(message).lower()
@@ -684,19 +686,26 @@ def show_shop_menu():
     print('(B)ackpack upgrade to carry {} items for {} GP'.format(backpack_capacity + BACKPACK_UPGRADE_AMOUNT, backpack_capacity * 2))
     accepted_inputs.append('b')
 
+    if player['torch_level'] == TORCH_MAX_LEVEL:
+        print('Your torch cannot be enchanted any more!')
+    else:
+        view_size = 1 + (player['torch_level'] + 1) * 2
+        print('(T)orch enchantment to increase view size to {}x{} for {} GP'.format(view_size, view_size, player['torch_level'] * 100))
+        accepted_inputs.append('t')
+
     print('(L)eave shop ')
     accepted_inputs.append('l')
 
     print('-----------------------------------------------------------')
     print('GP:', player['GP'])
     print('-----------------------------------------------------------')
-    return pickaxe_prices[pickaxe_level], backpack_capacity * 2, accepted_inputs
+    return pickaxe_prices[pickaxe_level], backpack_capacity * 2, player['torch_level'] * 100, accepted_inputs
 
 
 # manages purchasing upgrades
 def shop_menu(player):
     while True:
-        pickaxe_price, backpack_price, accepted_inputs = show_shop_menu()
+        pickaxe_price, backpack_price, torch_price, accepted_inputs = show_shop_menu()
         choice = prompt(accepted_inputs)
         if choice == 'p':
             if pickaxe_price > player['GP']:
@@ -714,6 +723,15 @@ def shop_menu(player):
                 print("Congratulations! You can now carry {} items!".format(player['backpack_capacity']))
                 player['GP'] -= backpack_price
             continue           
+        elif choice == 't':
+            if torch_price > player['GP']:
+                print("You don't have enough money for this enchantment!")
+            else:
+                player['torch_level'] += 1
+                view_size = 1 + player['torch_level'] * 2
+                print('Congratulations, your view size has increased to {}x{}!'.format(view_size, view_size))
+                player['GP'] -= torch_price
+            continue
         else:
             break
 
