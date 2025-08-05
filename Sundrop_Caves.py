@@ -425,7 +425,7 @@ def save_file_details(save_file):
     try: 
         with open(save_file, 'r') as save:
             save.readline() # skip game state
-            save_file_info.append(save.readline().strip().split(',')[1]) # get name
+            save_file_info.append(save.readline().strip().split(',',1)[1]) # get name
             save_file_info.append('DAY ' + save.readline().strip().split(',')[1])
             save_file_info.append('GP: ' + save.readline().strip().split(',')[1])
             save_file_info.append('STEPS: ' + save.readline().strip().split(',')[1])
@@ -509,6 +509,8 @@ def add_high_score(player):
         global_save = open(GLOBAL_SAVE_FILE, 'r')
         
     data = global_save.read()
+    global_save.close()
+    
     new_score = ','.join([player['name'], str(player['day']), str(player['steps']), str(player['GP'])])
 
     if data:
@@ -530,9 +532,6 @@ def add_high_score(player):
                     if int(new_score_info[-1]) >= int(score_info[-1]): # sort by GP
                         break
 
-        else:
-            new_high_score = False
-
         # rewrite data list, but with the appended data in the correct position
         new_data = []
         for item in range(score_pos):
@@ -543,19 +542,18 @@ def add_high_score(player):
         for item in range(score_pos, len(data)):
             new_data.append(data[item])
 
-        global_save.close()
-        global_save = open(GLOBAL_SAVE_FILE, 'w')
+        if score_pos < LEADERBOARD_SIZE:
+            print('Congratulations! You have a new high score on the leaderboard!')
 
+        global_save = open(GLOBAL_SAVE_FILE, 'w')
+        
         for score_pos in range(len(new_data)):
             if score_pos == len(new_data) - 1:
                 global_save.write(new_data[score_pos])
             else:
                 global_save.write(new_data[score_pos] + '\n')
-        
-        if score_pos < LEADERBOARD_SIZE:
-            print('Congratulations! You have a new high score on the leaderboard!')
+
     else:
-        global_save.close()
         global_save = open(GLOBAL_SAVE_FILE, 'w')
 
         global_save.write(new_score)
