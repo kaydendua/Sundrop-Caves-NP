@@ -4,6 +4,7 @@ import pytest
 # it deeply upsets me that i cannot use classes
 
 # TODO:
+# switch to copper silver gold instead of backpack storage
 # show inventory
 # warehouse and selling 
 # random events
@@ -70,7 +71,7 @@ drop_rates['gold'] = (1, 2)
 
 # This function handles all prompts. It takes in a list of valid inputs and
 # loops until it receives a valid input.
-def prompt(valid=[], message='Your choice? '):      
+def prompt(valid=None, message='Your choice? '):      
     while True:
         player_input = input(message).lower()
         check = player_input.lower()
@@ -107,7 +108,7 @@ def load_map(save_data, start_read, end_read, game_map):
     game_map.clear()
     
     text_to_list(save_data, start_read, end_read, game_map, MAP_NODES)
-        
+
     MAP_WIDTH = len(game_map[0])
     MAP_HEIGHT = len(game_map)
 
@@ -191,8 +192,8 @@ def generate_map(map_width, map_height, spread, min_density, max_density):
                         continue
 
                     elif distance_from('T', [row, col], map_struct) < 0.15 * max_distance:
-                        if randint(1,2) == 1:
-                            # cannot put ores too close together
+                        if randint(1,2) == 1:              
+                            # cannot put ores too close together -> will result in very large and dense clusters
                             if distance_from(' T', [row, col], map_struct, True) > spread:
                                 map_struct[row][col] = 'C'
                     
@@ -253,7 +254,7 @@ def generate_map(map_width, map_height, spread, min_density, max_density):
         # therefore, a maximum density check is in place to prevent a map that is too full of ores.
 
         if ore_count < max_density * map_height * map_width:
-            if copper_count >= 15 and silver_count >= 10 and gold_count >= 10: # ensure sufficient ore for the player
+            if copper_count >= 20 and silver_count >= 20 and gold_count >= 20: # ensure sufficient ore for the player
                 break
 
     return map_struct
@@ -281,7 +282,7 @@ def initialize_game(save_file, game_map, fog, current_map, player):
 
     game_state = 'town'
     MAP_HEIGHT = 10
-    MAP_WIDTH = 31
+    MAP_WIDTH = 30
 
     # initialize map
     game_map.clear()
@@ -509,61 +510,56 @@ def add_high_score(player):
         
     data = global_save.read()
     new_score = ','.join([player['name'], str(player['day']), str(player['steps']), str(player['GP'])])
+
     if data:
         data = data.split('\n')
-        data.append(new_score)
+        new_score_info = new_score.split(',')
 
-        # basically just bubble sort
-        for line in range(len(data) - 1, 0,-1):
-            current_info = data[line].split(',')
-            above_info = data[line - 1].split(',')
+        for score_pos in range(0, len(data)):
+            score_info = data[score_pos].split(',')
 
-            # go through the list until there is a score greater than the current one
-            # read backwards to dodge player name inteference
+            # go through the list until there is a score worse than the current one
+            # read from right to left to dodge player name inteference
             # i.e. comma in player name
-            if int(current_info[-3]) < int(above_info[-3]): # sort by days
+            if int(new_score_info[-3]) < int(score_info[-3]): # sort by days
                 break
-            elif int(current_info[-3]) == int(above_info[-3]):
-                if int(current_info[-2]) < int(above_info[-2]): # sort by steps
+            elif int(new_score_info[-3]) == int(score_info[-3]):
+                if int(new_score_info[-2]) < int(score_info[-2]): # sort by steps
                     break
-                elif int(current_info[-2]) == int(above_info[-2]): 
-                    if int(current_info[-1]) <= int(above_info[-1]): # sort by GP
+                elif int(new_score_info[-2]) == int(score_info[-2]): 
+                    if int(new_score_info[-1]) >= int(score_info[-1]): # sort by GP
                         break
 
-        if line == len(data):
-            new_high_score = True
         else:
             new_high_score = False
+
         # rewrite data list, but with the appended data in the correct position
         new_data = []
-        for item in range(line):
+        for item in range(score_pos):
             new_data.append(data[item])
         
-        new_data.append(data.pop(-1))
+        new_data.append(new_score)
 
-        for item in range(line, len(data)):
+        for item in range(score_pos, len(data)):
             new_data.append(data[item])
-        
-        while len(new_data) > LEADERBOARD_SIZE:
-            new_data.pop(-1)
 
         global_save.close()
         global_save = open(GLOBAL_SAVE_FILE, 'w')
 
-        for line in range(len(new_data)):
-            if line == len(new_data) - 1:
-                global_save.write(new_data[line])
+        for score_pos in range(len(new_data)):
+            if score_pos == len(new_data) - 1:
+                global_save.write(new_data[score_pos])
             else:
-                global_save.write(new_data[line] + '\n')
-
-        if new_high_score:
+                global_save.write(new_data[score_pos] + '\n')
+        
+        if score_pos < LEADERBOARD_SIZE:
             print('Congratulations! You have a new high score on the leaderboard!')
-
     else:
         global_save.close()
         global_save = open(GLOBAL_SAVE_FILE, 'w')
 
         global_save.write(new_score)
+    
         print('Congratulations! You have a new high score on the leaderboard!')
 
     global_save.close()
@@ -577,20 +573,23 @@ def show_high_scores():
             rank = 1
             print()
             print("--------------------- HIGH SCORES ---------------------")
-            for high_score in data:
-                high_score = high_score.split(',')
-                name = high_score[0]
-                day = high_score[1]
-                GP = high_score[2]
-                steps = high_score[3]
+            for score_pos in range(LEADERBOARD_SIZE):
+                high_score = data[score_pos].split(',')
+
+                # high score is processed like this so commas in the name will not interfere
+                day = high_score.pop(-3)
+                steps = high_score.pop(-2)
+                GP = high_score.pop(-1)
+                name = ','.join(high_score)
+
                 print(" #{} {:>50}".format(rank, 'DAY ' + day))
 
                 if len(name) <= 26:
-                    print(" {:<26} {:>26}".format(name, 'GP: ' + GP))
-                    print(" {:>53}".format('STEPS: ' + steps))
+                    print(" {:<26} {:>26}".format(name, 'STEPS: ' + steps))
+                    print(" {:>53}".format('GP: ' + GP))
                 elif len(name) <= 52:
-                    print(" {:<26} {:>26}".format(name[:26], 'GP: ' + GP))
-                    print(" {:<26} {:>26}".format(name[26:], 'STEPS: ' + steps))
+                    print(" {:<26} {:>26}".format(name[:26], 'STEPS: ' + steps))
+                    print(" {:<26} {:>26}".format(name[26:], 'GP: ' + GP))
                 else:
                     split_name = []
                     for n in range(int(len(name)/26)):
@@ -598,8 +597,8 @@ def show_high_scores():
                     if len(name) > (n+1) * 26:
                         split_name.append(name[(n+1)*26:])
 
-                    print(" {:<26} {:>26}".format(split_name.pop(0), 'GP: ' + GP))
-                    print(" {:<26} {:>26}".format(split_name.pop(1), 'STEPS: ' + steps))
+                    print(" {:<26} {:>26}".format(split_name.pop(0), 'STEPS: ' + steps))
+                    print(" {:<26} {:>26}".format(split_name.pop(1), 'GP: ' + GP))
                     
                     for part in split_name:
                         print(" {:<26}".format(part))
