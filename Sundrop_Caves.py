@@ -21,6 +21,8 @@ import pytest
 #
 # 2nd mine and bossfight
 
+#------------------------- GLOBAL VARIABLES -------------------------
+
 game_state = 'main'
 
 player = {}
@@ -69,6 +71,8 @@ drop_rates['copper'] = (1, 5)
 drop_rates['silver'] = (1, 3)
 drop_rates['gold'] = (1, 2)
 
+
+#---------------------------------- FUNCTIONS ----------------------------------
 
 # This function handles all prompts. It takes in a list of valid inputs and
 # loops until it receives a valid input.
@@ -428,9 +432,9 @@ def save_file_details(save_file):
         with open(save_file, 'r') as save:
             save.readline() # skip game state
             save_file_info.append(save.readline().strip().split(',',1)[1]) # get name
-            save_file_info.append('DAY ' + save.readline().strip().split(',')[1])
-            save_file_info.append('GP: ' + save.readline().strip().split(',')[1])
-            save_file_info.append('STEPS: ' + save.readline().strip().split(',')[1])
+            save_file_info.append(save.readline().strip().split(',')[1]) # get day
+            save_file_info.append(save.readline().strip().split(',')[1]) # get GP
+            save_file_info.append(save.readline().strip().split(',')[1]) # get steps
         return save_file_info
     except FileNotFoundError:
         return None
@@ -440,16 +444,38 @@ def save_file_details(save_file):
 def choose_save_slot(saving=True):
     while True:
         print()
+        print('---------------------------- SAVE SLOTS -----------------------------')
         for slot in range(1, MAX_SAVE_SLOTS + 1):
-            print('----- Slot {} -----'.format(slot))
-            save_file = SAVE_FILE_NAME.format(slot)
-            save_file_info = save_file_details(save_file)
-            if save_file_info:
-                for info in save_file_info:
-                    print(info)
+            save_file_info = save_file_details(SAVE_FILE_NAME.format(slot))
+            name = save_file_info[0]
+            day = save_file_info[1]
+            GP = save_file_info[2]
+            steps = save_file_info[3]
+            print(' {:<33} {:>33} '.format('SLOT ' + str(slot),'DAY ' + day))
+            if len(name) <= 33:
+                print(' {:<33} {:>33} '.format(name, 'STEPS: ' + steps))
+                print(' {:>67} '.format('GP: ' + GP))
             else:
-                print('Empty save slot')
-        print('------------------')
+                split_name = []
+                for n in range(int(len(name)/33)):
+                    split_name.append(name[n*33:(n+1)*33])
+                if len(name) > (n+1) * 33:
+                    split_name.append(name[(n+1)*33:])
+
+                print(' {:<33} {:>33} '.format(split_name.pop(0), 'STEPS: ' + steps))
+                print(' {:<33} {:>33} '.format(split_name.pop(0), 'GP: ' + GP))
+                for part in split_name:
+                    print(' {:<33}'.format(part))
+            print('---------------------------------------------------------------------')
+        #     print('----- Slot {} -----'.format(slot))
+        #     save_file = SAVE_FILE_NAME.format(slot)
+        #     save_file_info = save_file_details(save_file)
+        #     if save_file_info:
+        #         for info in save_file_info:
+        #             print(info)
+        #     else:
+        #         print('Empty save slot')
+        # print('------------------')
 
         save_file = SAVE_FILE_NAME.format(prompt(['1','2','3','4','5','q'], "Please select a save slot (Q to close): "))
         if 'q' in save_file:
@@ -565,6 +591,16 @@ def add_high_score(player):
     global_save.close()
 
 
+# returns the appropriate suffix for a number
+# e.g. returns 'st' if number = 1
+def number_suffix(number):
+    last_digit = int(str(number)[-1])
+    suffixes = ['st','nd','rd','th']
+    if last_digit > 4:
+        last_digit = 4
+    return suffixes[last_digit - 1] # note that it returns 'th' if 0, which is correct.
+        
+
 # displays the top scores
 def show_high_scores():
     with open(GLOBAL_SAVE_FILE, 'r') as global_save:
@@ -582,14 +618,11 @@ def show_high_scores():
                 GP = high_score.pop(-1)
                 name = ','.join(high_score)
 
-                print(" #{} {:>50}".format(rank, 'DAY ' + day))
+                print(" {:<5} {:>47}".format(str(rank) + number_suffix(rank), 'DAY ' + day))
 
                 if len(name) <= 26:
                     print(" {:<26} {:>26}".format(name, 'STEPS: ' + steps))
                     print(" {:>53}".format('GP: ' + GP))
-                elif len(name) <= 52:
-                    print(" {:<26} {:>26}".format(name[:26], 'STEPS: ' + steps))
-                    print(" {:<26} {:>26}".format(name[26:], 'GP: ' + GP))
                 else:
                     split_name = []
                     for n in range(int(len(name)/26)):
@@ -598,7 +631,7 @@ def show_high_scores():
                         split_name.append(name[(n+1)*26:])
 
                     print(" {:<26} {:>26}".format(split_name.pop(0), 'STEPS: ' + steps))
-                    print(" {:<26} {:>26}".format(split_name.pop(1), 'GP: ' + GP))
+                    print(" {:<26} {:>26}".format(split_name.pop(0), 'GP: ' + GP))
                     
                     for part in split_name:
                         print(" {:<26}".format(part))
