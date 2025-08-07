@@ -447,25 +447,30 @@ def choose_save_slot(saving=True):
         print('---------------------------- SAVE SLOTS -----------------------------')
         for slot in range(1, MAX_SAVE_SLOTS + 1):
             save_file_info = save_file_details(SAVE_FILE_NAME.format(slot))
-            name = save_file_info[0]
-            day = save_file_info[1]
-            GP = save_file_info[2]
-            steps = save_file_info[3]
-            print(' {:<33} {:>33} '.format('SLOT ' + str(slot),'DAY ' + day))
-            if len(name) <= 33:
-                print(' {:<33} {:>33} '.format(name, 'STEPS: ' + steps))
-                print(' {:>67} '.format('GP: ' + GP))
-            else:
-                split_name = []
-                for n in range(int(len(name)/33)):
-                    split_name.append(name[n*33:(n+1)*33])
-                if len(name) > (n+1) * 33:
-                    split_name.append(name[(n+1)*33:])
+            if save_file_info:
+                name = save_file_info[0]
+                day = save_file_info[1]
+                GP = save_file_info[2]
+                steps = save_file_info[3]
+                print(' {:<33} {:>33} '.format('SLOT ' + str(slot),'DAY ' + day))
+                if len(name) <= 33:
+                    print(' {:<33} {:>33} '.format(name, 'STEPS: ' + steps))
+                    print(' {:>67} '.format('GP: ' + GP))
+                else:
+                    split_name = []
+                    for n in range(int(len(name)/33)):
+                        split_name.append(name[n*33:(n+1)*33])
+                    if len(name) > (n+1) * 33:
+                        split_name.append(name[(n+1)*33:])
 
-                print(' {:<33} {:>33} '.format(split_name.pop(0), 'STEPS: ' + steps))
-                print(' {:<33} {:>33} '.format(split_name.pop(0), 'GP: ' + GP))
-                for part in split_name:
-                    print(' {:<33}'.format(part))
+                    print(' {:<33} {:>33} '.format(split_name.pop(0), 'STEPS: ' + steps))
+                    print(' {:<33} {:>33} '.format(split_name.pop(0), 'GP: ' + GP))
+                    for part in split_name:
+                        print(' {:<33}'.format(part))
+            else:
+                print(' {:<33} {:>33} '.format('SLOT ' + str(slot),'EMPTY'))
+                print()
+                print()
             print('---------------------------------------------------------------------')
 
         valid = list(map(str, list(range(1, MAX_SAVE_SLOTS + 1))))
@@ -553,20 +558,18 @@ def add_high_score(player):
                     if int(new_score_info[-1]) >= int(score_info[-1]): # sort by GP
                         break
         
-        else:
-            score_pos = len(data)
+        else: # only runs if for loop reaches the end
+            score_pos = len(data) # put score at the end if it is worse than all other scores
 
         # rewrite data list, but with the appended data in the correct position
         new_data = []
         for item in range(score_pos):
             new_data.append(data[item])
-            print(item)
         
         new_data.append(new_score)
 
         for item in range(score_pos, len(data)):
             new_data.append(data[item])
-            print(item)
 
         if score_pos < LEADERBOARD_SIZE:
             print('Congratulations! You have a new high score on the leaderboard!')
