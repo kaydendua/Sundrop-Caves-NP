@@ -467,17 +467,10 @@ def choose_save_slot(saving=True):
                 for part in split_name:
                     print(' {:<33}'.format(part))
             print('---------------------------------------------------------------------')
-        #     print('----- Slot {} -----'.format(slot))
-        #     save_file = SAVE_FILE_NAME.format(slot)
-        #     save_file_info = save_file_details(save_file)
-        #     if save_file_info:
-        #         for info in save_file_info:
-        #             print(info)
-        #     else:
-        #         print('Empty save slot')
-        # print('------------------')
 
-        save_file = SAVE_FILE_NAME.format(prompt(['1','2','3','4','5','q'], "Please select a save slot (Q to close): "))
+        valid = list(map(str, list(range(1, MAX_SAVE_SLOTS + 1))))
+        valid.append('q')
+        save_file = SAVE_FILE_NAME.format(prompt(valid, "Please select a save slot (Q to close): "))
         if 'q' in save_file:
             return save_file
         elif save_file_details(save_file) and saving:
@@ -559,16 +552,21 @@ def add_high_score(player):
                 elif int(new_score_info[-2]) == int(score_info[-2]): 
                     if int(new_score_info[-1]) >= int(score_info[-1]): # sort by GP
                         break
+        
+        else:
+            score_pos = len(data)
 
         # rewrite data list, but with the appended data in the correct position
         new_data = []
         for item in range(score_pos):
             new_data.append(data[item])
+            print(item)
         
         new_data.append(new_score)
 
         for item in range(score_pos, len(data)):
             new_data.append(data[item])
+            print(item)
 
         if score_pos < LEADERBOARD_SIZE:
             print('Congratulations! You have a new high score on the leaderboard!')
@@ -929,13 +927,15 @@ def win_game(save_file, game_map, fog, current_map, player):
 def portal_stone(player, current_map):
     if player['portal_y'] != 0 and player['portal_x'] != 0:
         current_map[player['portal_y']][player['portal_x']] = ' '
-    if player['y'] != 0 and player['x'] != 0:
+        
+    if player['y'] == 0 and player['x'] == 0:
+        print('You return to town.')
+    else:
         player['portal_y'] = player['y']
         player['portal_x'] = player['x']
         current_map[player['portal_y']][player['portal_x']] = 'P'
         print('You place your portal stone here and zap back to town.')
-    else:
-        print('You return to town.')
+
     return_to_town(player)
 
 
