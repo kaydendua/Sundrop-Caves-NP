@@ -1,10 +1,8 @@
 from random import randint
 import pytest
-import re
+from re import fullmatch
 
 # TODO:
-# switch to copper silver gold instead of backpack storage
-# show inventory
 # warehouse and selling 
 
 
@@ -62,7 +60,7 @@ drop_rates['gold'] = (1, 2)
 #---------------------------------- FUNCTIONS ----------------------------------
 
 
-# This function handles all prompts. It takes in a list of valid inputs and
+# This function handles all prompts. It takes in a regex expression of valid inputs and
 # loops until it receives a valid input.
 # TODO: update to regex
 def prompt(valid=None, message='Your choice? '):      
@@ -71,7 +69,7 @@ def prompt(valid=None, message='Your choice? '):
         check = player_input.lower()
         if not valid: # empty valid array means all inputs are accepted
             return check
-        elif check in valid:
+        elif fullmatch(valid, player_input):
             return check
         else:
             print('"{}" is not a valid input. Please try again.'.format(player_input))
@@ -468,13 +466,13 @@ def choose_save_slot(saving=True):
                 print()
             print('---------------------------------------------------------------------')
 
-        valid = list(map(str, list(range(1, MAX_SAVE_SLOTS + 1))))
-        valid.append('q')
+        valid = '[1-' + str(MAX_SAVE_SLOTS) + ']|[q]'
+
         save_file = SAVE_FILE_NAME.format(prompt(valid, "Please select a save slot (Q to close): "))
         if 'q' in save_file:
             return save_file
         elif save_file_details(save_file) and saving:
-            if prompt(['y','n'], 'Warning! The save slot you have chosen already contains a save file. Are you sure you want to override it? [Y/N]: ') != 'y':
+            if prompt('[yn]', 'Warning! The save slot you have chosen already contains a save file. Are you sure you want to override it? [Y/N]: ') != 'y':
                 print("Cancelling save.")
                 continue
             else:
@@ -703,27 +701,27 @@ def show_town_menu():
 def show_shop_menu():
     pickaxe_level = player['pickaxe_level']
     backpack_capacity = player['backpack_capacity']
-    accepted_inputs = []
+    accepted_inputs = '['
     print()
     print('----------------------- Shop Menu -------------------------')
     if player['pickaxe_level'] == PICKAXE_MAX_LEVEL:
         print('Your pickaxe cannot be upgraded any further!')
     else:
         print('(P)ickaxe upgrade to Level {} to mine {} ore for {} GP'.format(pickaxe_level + 1, minerals[pickaxe_level], pickaxe_prices[pickaxe_level]))
-        accepted_inputs.append('p')
+        accepted_inputs += 'p'
 
     print('(B)ackpack upgrade to carry {} items for {} GP'.format(backpack_capacity + BACKPACK_UPGRADE_AMOUNT, backpack_capacity * 2))
-    accepted_inputs.append('b')
+    accepted_inputs += 'b'
 
     if player['torch_level'] == TORCH_MAX_LEVEL:
         print('Your torch cannot be enchanted any more!')
     else:
         view_size = 1 + (player['torch_level'] + 1) * 2
         print('(T)orch enchantment to increase view size to {}x{} for {} GP'.format(view_size, view_size, player['torch_level'] * 100))
-        accepted_inputs.append('t')
+        accepted_inputs += 't'
 
     print('(L)eave shop ')
-    accepted_inputs.append('l')
+    accepted_inputs += 'l]'
 
     print('-----------------------------------------------------------')
     print('GP:', player['GP'])
@@ -801,7 +799,7 @@ def interact_node(current_map, player, node_coords):
         player[mineral_names[node]] += amount_mined
                    
     elif node == 'T' or node == 'P':
-        if prompt(['y','n'], "Would you like to return to town? [Y/N]: ") == 'y':
+        if prompt('[yn]', "Would you like to return to town? [Y/N]: ") == 'y':
             return_to_town(player)
 
     player['steps'] += 1        
@@ -965,8 +963,7 @@ def mine(save_file, game_map, fog, current_map, player):
     print('---------------------------------------------------')
     print('{:^51}'.format('DAY ' + str(player['day'])))
     print('---------------------------------------------------')
-    valid = ['m', 'i', 'p', 'q']
-    valid.extend(movement_buttons)
+    valid = '[mipq' + ''.join(movement_buttons) + ']'
 
     while True:
         show_mine_menu(current_map, player)
@@ -989,7 +986,7 @@ def mine(save_file, game_map, fog, current_map, player):
             print('-----------------------------------------------------')
             portal_stone(player, current_map)
         else:
-            save_or_not = prompt(['y','n'],"Would you like to save before quitting? Unsaved data will be lost otherwise. [Y/N]: ")
+            save_or_not = prompt('[yn]',"Would you like to save before quitting? Unsaved data will be lost otherwise. [Y/N]: ")
             if save_or_not == 'y':
                 save_game(save_file, game_map, fog, current_map, player)
             game_state = 'main'
@@ -1022,7 +1019,7 @@ def town(save_file, game_map, fog, current_map, player):
     
     while True:
         show_town_menu()
-        player_action = prompt(['b','i','m','e','v','q'])
+        player_action = prompt('[bimevq]')
         if player_action == 'b':
             shop_menu(player)
         elif player_action == 'i':
@@ -1035,7 +1032,7 @@ def town(save_file, game_map, fog, current_map, player):
         elif player_action == 'v':
             save_game(save_file, game_map, fog, current_map, player)
         else:
-            save_or_not = prompt(['y','n'],"Would you like to save before quitting? Unsaved data will be lost otherwise. [Y/N]: ")
+            save_or_not = prompt('[yn]',"Would you like to save before quitting? Unsaved data will be lost otherwise. [Y/N]: ")
             if save_or_not == 'y':
                 save_game(save_file, game_map, fog, current_map, player)
             game_state = 'main'
@@ -1063,7 +1060,7 @@ def main_menu(game_map, fog, current_map, player):
 
     while True:
         show_main_menu()
-        main_menu_choice = prompt(['n','l','h','q'])
+        main_menu_choice = prompt('[nlhq]')
 
         if main_menu_choice == 'n':
             save_file = choose_save_slot()
