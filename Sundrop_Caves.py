@@ -1,25 +1,12 @@
 from random import randint
 import pytest
-
-# it deeply upsets me that i cannot use classes
+import re
 
 # TODO:
 # switch to copper silver gold instead of backpack storage
 # show inventory
 # warehouse and selling 
-# random events
-# travelling merchant (appears every 5 days, has 3 random items)
-#   magic torch
-#   super torch (unlocked after magic torch)
-#   steel blade
-#   special key (dragon)
-#   ore package (random amount of ores sold at minimum price)
-#   miner's watch (replenish all nodes)
-#   hard hat (less random events)
-#   four-leaf clover (more random events)
-#   red vial (burns enemies, heals player)
-#
-# 2nd mine and bossfight
+
 
 #------------------------- GLOBAL VARIABLES -------------------------
 
@@ -32,7 +19,7 @@ fog = []
 
 MAX_SAVE_SLOTS = 5
 
-PLAYER_DICT_SIZE = 16
+PLAYER_DICT_SIZE = 15
 PLAYER_DATA_LINES = 50
 MAP_NODES = ['T', 'C', 'S', 'G', 'P']
 FOG_NODES = ['?']
@@ -73,6 +60,7 @@ drop_rates['gold'] = (1, 2)
 
 
 #---------------------------------- FUNCTIONS ----------------------------------
+
 
 # This function handles all prompts. It takes in a list of valid inputs and
 # loops until it receives a valid input.
@@ -326,8 +314,7 @@ def initialize_game(save_file, game_map, fog, current_map, player):
     player['torch_level'] = 1
     player['portal_x'] = 0
     player['portal_y'] = 0
-    player['backpack_storage'] = []
-    
+
     save_game(save_file, game_map, fog, current_map, player)
 
 
@@ -411,17 +398,25 @@ def draw_view(current_map, player, nodes, view_padding):
 # displays player information
 def show_information(player):
     print()
-    print("----- Player Information -----")
+    print("--------- Player Information ---------")
     print("Name:", player['name'])
     print("Portal position: ({}, {})".format(player['portal_x'], player['portal_y']))
     print("Pickaxe level: {} ({})".format(player['pickaxe_level'], minerals[player['pickaxe_level'] - 1]))
-    print("------------------------------")
-    print(player['backpack_storage']) # TODO: inventory display
-    print("Load: {} / {}".format(len(player['backpack_storage']), player['backpack_capacity']))
-    print("------------------------------")
+    
+    if sum([player[mineral] for mineral in minerals]) != 0:
+        print("-------------- Backpack --------------")
+        for mineral in minerals:
+            if player[mineral]:
+                spacing = max([len(mineral) + 2 for mineral in minerals])
+                ore_name = '(' + mineral[0].upper() + ')' + mineral[1:]
+                print("{:<} | x{:<}".format(ore_name + ' ' * (spacing - len(ore_name)), player[mineral]))
+                
+    print("--------------------------------------")
+    print("Load: {} / {}".format(sum([player[mineral] for mineral in minerals]), player['backpack_capacity']))
+    print("--------------------------------------")
     print("GP:", player['GP'])
     print("Steps taken:", player['steps'])
-    print("------------------------------")
+    print("--------------------------------------")
 
 
 # This function reads key information from a save file for temporary display, 
@@ -597,7 +592,7 @@ def add_high_score(player):
 def number_suffix(number):
     last_digit = int(str(number)[-1])
     suffixes = ['st','nd','rd','th']
-    if last_digit > 4:
+    if last_digit > 4 or 11 <= number <= 13:
         last_digit = 4
     return suffixes[last_digit - 1] # note that it returns 'th' if 0, which is correct.
         
@@ -777,7 +772,7 @@ def show_mine_menu(current_map, player):
     nodes = get_surrounding_nodes([player['y'], player['x']], player['torch_level'])
     viewport = draw_view(current_map, player, nodes, VIEW_PADDING)
     print(viewport)
-    print('Turns left: {:<5} Load: {} / {}    Steps: {}'.format(player['turns'], len(player['backpack_storage']), player['backpack_capacity'], player['steps']))
+    print('Turns left: {:<5} Load: {} / {}    Steps: {}'.format(player['turns'], sum([player[mineral] for mineral in minerals]), player['backpack_capacity'], player['steps']))
     print('(WASD) to move')
     print('(M)ap, (I)nformation, (P)ortal, (Q)uit to main menu')
 
@@ -797,14 +792,14 @@ def interact_node(current_map, player, node_coords):
         current_map[node_coords[0]][node_coords[1]] = ' '
         amount_mined = mine_ore(node)
         print('You mined {} piece(s) of {}.'.format(amount_mined, mineral_names[node]))
-
-        for pieces in range(amount_mined):
-            player['backpack_storage'].append(node)
-            if len(player['backpack_storage']) > player['backpack_capacity']:
-                player['backpack_storage'].pop(0)
-                print('...but you can only carry {} more piece(s)!'.format(pieces))
-                break
-
+        
+        backpack_load = sum([player[mineral] for mineral in minerals]) + amount_mined
+        if backpack_load > player['backpack_capacity']:
+            amount_mined -= backpack_load - player['backpack_capacity']
+            print('...but you can only carry {} more piece(s)!'.format(amount_mined))
+        
+        player[mineral_names[node]] += amount_mined
+                   
     elif node == 'T' or node == 'P':
         if prompt(['y','n'], "Would you like to return to town? [Y/N]: ") == 'y':
             return_to_town(player)
@@ -833,7 +828,7 @@ def attempt_move(player_action, player, current_map):
         print("That's a wall, you can't go that way.")
         return player['y'], player['x'], False
 
-    if len(player['backpack_storage']) == player['backpack_capacity'] and current_map[test_y][test_x] in mineral_names.keys():
+    if sum([player[mineral] for mineral in minerals]) == player['backpack_capacity'] and current_map[test_y][test_x] in mineral_names.keys():
         backpack_full = True
     else:
         backpack_full = False
@@ -868,35 +863,25 @@ def return_to_town(player):
     silver_price = randint(prices['silver'][0], prices['silver'][1])
     gold_price = randint(prices['gold'][0], prices['gold'][1])
 
-    copper_sold = 0
-    silver_sold = 0
-    gold_sold = 0
-    
-    for item in range(len(player['backpack_storage'])):
-        item = player['backpack_storage'].pop(0)
-        if item == 'C':
-            copper_sold += 1
-        elif item == 'S':
-            silver_sold += 1
-        elif item == 'G':
-            gold_sold += 1
-        # add more ores?
-        else:
-            print(item)
-    
     earned = 0
-    if copper_sold:
-        earned = copper_sold * copper_price
-        print("You sell {} copper ore for {} GP.".format(copper_sold, earned))
+    if player['copper']:
+        earned = player['copper'] * copper_price
+        print("You sell {} copper ore for {} GP.".format(player['copper'], earned))
         player['GP'] += earned
-    if silver_sold:
-        earned = silver_sold * silver_price
-        print("You sell {} silver ore for {} GP.".format(silver_sold, earned))
+        player['copper'] = 0
+
+    if player['silver']:
+        earned = player['silver'] * silver_price
+        print("You sell {} silver ore for {} GP.".format(player['silver'], earned))
         player['GP'] += earned
-    if gold_sold:
-        earned = gold_sold * gold_price
-        print("You sell {} gold ore for {} GP.".format(gold_sold, earned))
+        player['silver'] = 0
+
+    if player['gold']:
+        earned = player['gold'] * gold_price
+        print("You sell {} gold ore for {} GP.".format(player['gold'], earned))
         player['GP'] += earned
+        player['gold'] = 0
+
     if earned:
         print("You now have {} GP!".format(player['GP']))
     
@@ -976,7 +961,6 @@ def mine(save_file, game_map, fog, current_map, player):
 
     replenish_nodes(game_map, current_map)
 
-    player['turns'] = TURNS_PER_DAY
     print()
     print('---------------------------------------------------')
     print('{:^51}'.format('DAY ' + str(player['day'])))
