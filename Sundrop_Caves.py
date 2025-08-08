@@ -1,6 +1,7 @@
-from random import randint
+from random import randint, seed
 import pytest
 from re import fullmatch
+from time import time
 
 # TODO:
 # warehouse and selling 
@@ -8,6 +9,7 @@ from re import fullmatch
 
 #------------------------- GLOBAL VARIABLES -------------------------
 
+game_seed = None
 game_state = 'main'
 
 player = {}
@@ -268,9 +270,13 @@ def create_fog(fog):
 # sets up empty save file for new game
 def initialize_game(save_file, game_map, fog, current_map, player):
 
+    global game_seed
     global game_state
     global MAP_HEIGHT
     global MAP_WIDTH
+
+    game_seed = time()
+    seed(game_seed)
 
     game_state = 'town'
     MAP_HEIGHT = 10
@@ -436,7 +442,7 @@ def save_file_details(save_file):
         return None
 
 
-# Sundrop Caves has 5 save slots. This function will handle the selection logic.
+# Sundrop Caves has multiple save slots. This function will handle the selection logic.
 def choose_save_slot(saving=True):
     while True:
         print()
@@ -490,10 +496,11 @@ def choose_save_slot(saving=True):
 # saves game data into a save file
 def save_game(save_file, game_map, fog, current_map, player):
 
+    global game_seed
     global game_state
 
     save_data = []
-
+    save_data.append(str(game_seed))
     save_data.append(game_state)
     
     # save player 
@@ -514,7 +521,7 @@ def save_game(save_file, game_map, fog, current_map, player):
     for row in current_map:
         save_data.append(''.join(row))
     
-    with open(save_file, 'w') as save_file:        
+    with open(save_file, 'w') as save_file:
         save_file.write('\n'.join(save_data))
     print('Game saved.')
 
@@ -645,11 +652,15 @@ def load_game(save_file, game_map, fog, current_map, player):
     save_data = save_file.read().split('\n')
 
     global game_state
+    global game_seed
 
-    game_state = save_data[0]
+    game_seed = float(save_data[0])
+    seed(game_seed)
+
+    game_state = save_data[1]
 
     # load player
-    for line in range(1, PLAYER_DATA_LINES + 1):
+    for line in range(2, PLAYER_DATA_LINES + 2):
         if save_data[line]:
             info = save_data[line].split(',', 1)
             if info[1].isdigit():
@@ -665,13 +676,13 @@ def load_game(save_file, game_map, fog, current_map, player):
             break
 
     # load game map
-    load_map(save_data, PLAYER_DATA_LINES + 1, PLAYER_DATA_LINES + 11, game_map)
+    load_map(save_data, PLAYER_DATA_LINES + 2, PLAYER_DATA_LINES + 12, game_map)
             
     # load fog
-    text_to_list(save_data, PLAYER_DATA_LINES + 11, PLAYER_DATA_LINES + 21,fog, FOG_NODES)
+    text_to_list(save_data, PLAYER_DATA_LINES + 12, PLAYER_DATA_LINES + 22,fog, FOG_NODES)
 
     # load current map
-    text_to_list(save_data, PLAYER_DATA_LINES + 21, PLAYER_DATA_LINES + 31, current_map, MAP_NODES)
+    text_to_list(save_data, PLAYER_DATA_LINES + 22, PLAYER_DATA_LINES + 32, current_map, MAP_NODES)
 
     try:
         error_detect = 'Missing player data.'
