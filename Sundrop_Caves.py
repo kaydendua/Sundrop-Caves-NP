@@ -17,7 +17,7 @@ fog = []
 
 MAX_SAVE_SLOTS = 5
 
-PLAYER_DICT_SIZE = 15
+PLAYER_DICT_SIZE = 18
 PLAYER_DATA_LINES = 50
 MAP_NODES = ['T', 'C', 'S', 'G', 'P']
 FOG_NODES = ['?']
@@ -312,6 +312,9 @@ def initialize_game(save_file, game_map, fog, current_map, player):
     player['torch_level'] = 1
     player['portal_x'] = 0
     player['portal_y'] = 0
+    player['copper_price'] = randint(prices['copper'][0], prices['copper'][1])
+    player['silver_price'] = randint(prices['silver'][0], prices['silver'][1])
+    player['gold_price'] = randint(prices['gold'][0], prices['gold'][1])
 
     save_game(save_file, game_map, fog, current_map, player)
 
@@ -683,19 +686,50 @@ def load_game(save_file, game_map, fog, current_map, player):
         quit()
 
 
-# display town menu
-def show_town_menu():
-    print()
-    print("DAY", player['day'])
-    print("----- Sundrop Town -----")
-    print("(B)uy stuff")
-    print("See Player (I)nformation")
-    print("See Mine (M)ap")
-    print("(E)nter mine")
-    print("Sa(V)e game")
-    print("(Q)uit to main menu")
-    print("------------------------")
+# display sell menu
+def show_sell_menu(player):
+    
+    valid = '['
 
+    print()
+    print('-------- Prices --------')
+    for mineral in minerals:
+        spacing = max([len(mineral) for mineral in minerals])
+        print("{:<} - {:>2} GP".format(mineral.capitalize() + ' ' * (spacing - len(mineral)), player[mineral + '_price']))
+    print('------------------------')
+
+    if sum([player[mineral] for mineral in minerals]) == 0:
+        print('You have no ores!')
+    else:
+        print('Sell (A)ll')
+        valid += 'a'
+
+    print('(L)eave sell menu')
+    valid += 'l]'
+    print('------------------------')
+
+    return valid
+
+
+# manage selling of ores
+def sell_menu(player):
+
+    global game_state
+
+    game_state = 'sell'
+
+    valid = show_sell_menu(player)
+
+    while True:
+        player_input = prompt(valid)
+        if player_input == 'a':
+            sell_ores(player)
+            game_state = 'town'
+        else:
+            game_state = 'town'
+        
+        if game_state != 'sell':
+            break
 
 # display shop menu and calculate prices
 def show_shop_menu():
@@ -720,7 +754,7 @@ def show_shop_menu():
         print('(T)orch enchantment to increase view size to {}x{} for {} GP'.format(view_size, view_size, player['torch_level'] * 100))
         accepted_inputs += 't'
 
-    print('(L)eave shop ')
+    print('(L)eave shop')
     accepted_inputs += 'l]'
 
     print('-----------------------------------------------------------')
@@ -849,33 +883,25 @@ def attempt_move(player_action, player, current_map):
     else:
         return test_y, test_x, True
 
-
-# handles selling and new day
-def return_to_town(player):
+def sell_ores(player):
 
     global game_state
 
-    game_state = 'town'
-
-    copper_price = randint(prices['copper'][0], prices['copper'][1])
-    silver_price = randint(prices['silver'][0], prices['silver'][1])
-    gold_price = randint(prices['gold'][0], prices['gold'][1])
-
     earned = 0
     if player['copper']:
-        earned = player['copper'] * copper_price
+        earned = player['copper'] * player['copper_price']
         print("You sell {} copper ore for {} GP.".format(player['copper'], earned))
         player['GP'] += earned
         player['copper'] = 0
 
     if player['silver']:
-        earned = player['silver'] * silver_price
+        earned = player['silver'] * player['silver_price']
         print("You sell {} silver ore for {} GP.".format(player['silver'], earned))
         player['GP'] += earned
         player['silver'] = 0
 
     if player['gold']:
-        earned = player['gold'] * gold_price
+        earned = player['gold'] * player['gold_price']
         print("You sell {} gold ore for {} GP.".format(player['gold'], earned))
         player['GP'] += earned
         player['gold'] = 0
@@ -885,9 +911,20 @@ def return_to_town(player):
     
     if player['GP'] >= WIN_GP:   
         game_state = "win"
-    else:
-        player['day'] += 1
-        player['turns'] = TURNS_PER_DAY
+
+# handles selling and new day
+def return_to_town(player):
+
+    global game_state
+
+    game_state = 'town'
+
+    player['copper_price'] = randint(prices['copper'][0], prices['copper'][1])
+    player['silver_price'] = randint(prices['silver'][0], prices['silver'][1])
+    player['gold_price'] = randint(prices['gold'][0], prices['gold'][1])
+    
+    player['day'] += 1
+    player['turns'] = TURNS_PER_DAY
 
 
 # the script that runs when the game is won
@@ -995,21 +1032,19 @@ def mine(save_file, game_map, fog, current_map, player):
             break
 
 
-# runs the appropriate function based on game state
-def game(save_file, game_map, fog, current_map, player):
-
-    global game_state
-
-    while True:
-        if game_state == 'town':
-            town(save_file, game_map, fog, current_map, player)
-        elif game_state == 'mine':
-            mine(save_file, game_map, fog, current_map, player)
-        elif game_state == 'main':
-            break
-        elif game_state == 'win':
-            win_game(save_file, game_map, fog, current_map, player)
-            break
+# display town menu
+def show_town_menu():
+    print()
+    print("DAY", player['day'])
+    print("----- Sundrop Town -----")
+    print("(B)uy stuff")
+    print("(S)ell ores")
+    print("See Player (I)nformation")
+    print("See Mine (M)ap")
+    print("(E)nter mine")
+    print("Sa(V)e game")
+    print("(Q)uit to main menu")
+    print("------------------------")
 
 
 # manages all town related decisions
@@ -1019,9 +1054,11 @@ def town(save_file, game_map, fog, current_map, player):
     
     while True:
         show_town_menu()
-        player_action = prompt('[bimevq]')
+        player_action = prompt('[bsimevq]')
         if player_action == 'b':
             shop_menu(player)
+        elif player_action == 's':
+            sell_menu(player)
         elif player_action == 'i':
             show_information(player)
         elif player_action == 'm':
@@ -1039,6 +1076,23 @@ def town(save_file, game_map, fog, current_map, player):
             break
             
         if game_state != 'town':
+            break
+
+
+# runs the appropriate function based on game state
+def game(save_file, game_map, fog, current_map, player):
+
+    global game_state
+
+    while True:
+        if game_state == 'town':
+            town(save_file, game_map, fog, current_map, player)
+        elif game_state == 'mine':
+            mine(save_file, game_map, fog, current_map, player)
+        elif game_state == 'main':
+            break
+        elif game_state == 'win':
+            win_game(save_file, game_map, fog, current_map, player)
             break
 
 
