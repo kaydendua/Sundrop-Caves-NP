@@ -419,17 +419,15 @@ def show_backpack(player):
     return valid
 
 
-# handles selection of ores for warehouse and sell functions
+# handles selection of ores from backpack
 # mode will equal 'sell' or 'store'
-def choose_ore(player, mode):
+def choose_backpack_ore(player, mode):
     
     print()
     valid = show_backpack(player)
 
-    selection = []
-
     while True:
-        player_input = prompt(valid, "Choose an ore to {} (Q to cancel): ".format(mode))
+        player_input = prompt(valid, "Choose a mineral to {} (Q to cancel): ".format(mode))
         if player_input.upper() in mineral_names.keys():
             chosen_ore = player_input.upper()
             ore_count = prompt(r'\d+',"How much {} would you like to {}? ".format(mineral_names[chosen_ore], mode))
@@ -438,6 +436,20 @@ def choose_ore(player, mode):
             return 'q'
             
 
+# handles selection of ores to sell from warehouse
+def choose_warehouse_ore(valid):
+    while True:
+        print(valid)
+        player_input = prompt(valid, "Choose a mineral to sell (A to sell all, Q to cancel): ")
+        if player_input.upper() in mineral_names.keys():
+            chosen_ore = player_input.upper()
+            ore_count = prompt(r'\d+',"How much {} would you like to sell? ".format(mineral_names[chosen_ore]))
+            return [chosen_ore, int(ore_count)]
+        elif player_input == 'a':
+            return 'a'
+        else:
+            return 'q'
+        
 
 # displays player information
 def show_information(player):
@@ -731,8 +743,8 @@ def load_game(save_file, game_map, fog, current_map, player):
         quit()
 
 
-# display warehouse menu and determine valid inputs and upgrade price
-def show_warehouse_menu(player):
+# draws the warehouse and the ores it contains
+def draw_warehouse(player):
     print()
     print('Warehouse')
     size = 2 + player['warehouse_level']
@@ -753,20 +765,31 @@ def show_warehouse_menu(player):
 
     print('+' + '-' * size + '-' * (size + 1) * VIEW_PADDING + '+')
     print('Level: {} ({}x{})'.format(player['warehouse_level'], size, size))
-    price = 5 + player['warehouse_level'] * 25
 
-    if player['warehouse'] == size ** 2:
+
+# display warehouse menu and determine valid inputs and upgrade price
+def show_warehouse_menu(player):
+
+    draw_warehouse(player)
+
+    upgrade_price = 5 + player['warehouse_level'] * 25
+
+    valid = '['
+    if player['warehouse'] == (2 + player['warehouse_level']) ** 2:
         print('The warehouse is full!')
-        valid = '[ul]'
     elif sum([player[mineral] for mineral in minerals]) > 0:
-        valid = '[saul]'
+        valid += 'sa'
         print('(S)tore ores, Store (A)ll')
     else:
-        print('You have no ores!')
-        valid = '[ul]'
-    print('(U)pgrade storage ({} GP), (L)eave'.format(price))
+        print('Your backpack is empty!')
 
-    return price, valid
+    if player['warehouse']:
+        print('Sell (W)arehouse ores')
+        valid += 'w'
+    print('(U)pgrade storage ({} GP), (L)eave'.format(upgrade_price))
+    valid += 'ul]'
+
+    return upgrade_price, valid
 
 
 # automatically store as many ores as possible from player backpack
@@ -798,7 +821,7 @@ def warehouse_menu(player):
         player_input = prompt(valid)
 
         if player_input == 's':
-            selection = choose_ore(player, 'store')
+            selection = choose_backpack_ore(player, 'store')
             if selection != 'q':
                 ore = selection[0]
                 count = selection[1]
@@ -808,6 +831,8 @@ def warehouse_menu(player):
                 print('You stored {} {}!'.format(count, mineral_names[ore]))
         elif player_input == 'a':
             store_all_ores(player)
+        elif player_input == 'w':
+            sell_from_warehouse(player)
         elif player_input == 'u':
             if player['GP'] >= price:
                 player['warehouse_level'] += 1
@@ -823,7 +848,42 @@ def warehouse_menu(player):
             break
 
 
-# display sell menu
+# allows the player to sell the ores stored in their warehouse through the sell menu
+def sell_from_warehouse(player):
+
+    valid = '['
+    for mineral in player['warehouse']:
+        if mineral.lower() not in valid:
+            valid += mineral.lower()
+    valid += 'aq]'
+    selection = choose_warehouse_ore(valid)
+
+    if selection == 'a':
+        for ore in mineral_names.keys():
+            ore_name = mineral_names[ore]
+            if ore in player['warehouse']:
+                ore_count = player['warehouse'].count(ore)
+                earned = ore_count * player[ore_name + '_price']
+                print("You sell {} {} ore for {} GP.".format(ore_count, ore_name, earned))
+                player['GP'] += earned
+
+        player['warehouse'] = ''
+
+    elif selection != 'q':
+        ore = selection[0]
+        ore_name = mineral_names[ore]
+        count = selection[1]
+
+        if count > player['warehouse'].count(ore):
+            count = player['warehouse'].count(ore)
+
+        earned = player['warehouse'].count(ore) * player[ore_name + '_price']
+        print("You sell {} {} ore for {} GP.".format(count, ore_name, earned))
+        player['GP'] += earned
+        player['warehouse'].replace(selection[0],'',selection[1])
+
+
+# displays sell menu and returns valid player choices
 def show_sell_menu(player):
     
     valid = '['
@@ -840,6 +900,8 @@ def show_sell_menu(player):
     else:
         print('Choose from (B)ackpack')
         valid += 'b'
+        print('Choose from (W)arehouse')
+        valid += 'w'
         print('Sell (A)ll')
         valid += 'a'
 
@@ -894,14 +956,18 @@ def sell_menu(player):
         player_input = prompt(valid)
 
         if player_input == 'b':
-            selection = choose_ore(player, mode='sell')
+            selection = choose_backpack_ore(player, mode='sell')
             if selection != 'q':
                 sell_ore(player, selection)
                 print("You now have {} GP!".format(player['GP']))
+        elif player_input == 'w':
+            draw_warehouse(player)
+            sell_from_warehouse(player)
         elif player_input == 'a':
             sell_all_ores(player)
             game_state = 'town'
         else:
+            print('Bye! See you again!')
             game_state = 'town'
         
         if player['GP'] >= WIN_GP:   
@@ -973,6 +1039,7 @@ def shop_menu(player):
                 player['GP'] -= torch_price
             continue
         else:
+            print('Bye! See you again!')
             break
 
 
