@@ -404,6 +404,41 @@ def draw_view(current_map, player, nodes):
     return view
 
 
+# displays player inventory
+def show_backpack(player):
+    print("-------------- Backpack --------------")
+    valid = '['
+    for mineral in minerals:
+        if player[mineral]:
+            spacing = max([len(mineral) + 2 for mineral in minerals])
+            ore_name = '(' + mineral[0].upper() + ')' + mineral[1:]
+            print("{:<} | x{:<}".format(ore_name + ' ' * (spacing - len(ore_name)), player[mineral]))
+            valid += mineral[0]
+    valid += 'q]'
+    print("--------------------------------------")
+    return valid
+
+
+# handles selection of ores for warehouse and sell functions
+# mode will equal 'sell' or 'store'
+def choose_ore(player, mode):
+    
+    print()
+    valid = show_backpack(player)
+
+    selection = []
+
+    while True:
+        player_input = prompt(valid, "Choose an ore to {} (Q to cancel): ".format(mode))
+        if player_input.upper() in mineral_names.keys():
+            chosen_ore = player_input.upper()
+            ore_count = prompt(r'\d+',"How much {} would you like to {}? ".format(mineral_names[chosen_ore], mode))
+            return [chosen_ore, int(ore_count)]
+        else:
+            return 'q'
+            
+
+
 # displays player information
 def show_information(player):
     print()
@@ -413,14 +448,10 @@ def show_information(player):
     print("Pickaxe level: {} ({})".format(player['pickaxe_level'], minerals[player['pickaxe_level'] - 1]))
     
     if sum([player[mineral] for mineral in minerals]) != 0:
-        print("-------------- Backpack --------------")
-        for mineral in minerals:
-            if player[mineral]:
-                spacing = max([len(mineral) + 2 for mineral in minerals])
-                ore_name = '(' + mineral[0].upper() + ')' + mineral[1:]
-                print("{:<} | x{:<}".format(ore_name + ' ' * (spacing - len(ore_name)), player[mineral]))
-                
-    print("--------------------------------------")
+        show_backpack(player)
+    else:
+        print("--------------------------------------")
+
     print("Load: {} / {}".format(sum([player[mineral] for mineral in minerals]), player['backpack_capacity']))
     print("--------------------------------------")
     print("GP:", player['GP'])
@@ -761,6 +792,7 @@ def warehouse_menu(player):
         if game_state != 'warehouse':
             break
 
+
 # display sell menu
 def show_sell_menu(player):
     
@@ -776,6 +808,8 @@ def show_sell_menu(player):
     if sum([player[mineral] for mineral in minerals]) == 0:
         print('You have no ores!')
     else:
+        print('Choose from (B)ackpack')
+        valid += 'b'
         print('Sell (A)ll')
         valid += 'a'
 
@@ -786,35 +820,38 @@ def show_sell_menu(player):
     return valid
 
 
+def sell_ore(player, selection):
+    ore_name = mineral_names[selection[0]]
+    count = selection[1]
+
+    if count > player[ore_name]:
+        count = player[ore_name]
+    
+    earned = player[ore_name] * player[ore_name + '_price']
+    print("You sell {} {} ore for {} GP.".format(player[ore_name], ore_name, earned))
+    player['GP'] += earned
+    player[ore_name] = 0
+
+    
+
 # Sells all player ores
-def sell_ores(player):
+def sell_all_ores(player):
 
     global game_state
 
     earned = 0
     if player['copper']:
-        earned = player['copper'] * player['copper_price']
-        print("You sell {} copper ore for {} GP.".format(player['copper'], earned))
-        player['GP'] += earned
-        player['copper'] = 0
+        sell_ore(player, ['C', player['copper']])
 
     if player['silver']:
-        earned = player['silver'] * player['silver_price']
-        print("You sell {} silver ore for {} GP.".format(player['silver'], earned))
-        player['GP'] += earned
-        player['silver'] = 0
+        sell_ore(player, ['S', player['silver']])
 
     if player['gold']:
-        earned = player['gold'] * player['gold_price']
-        print("You sell {} gold ore for {} GP.".format(player['gold'], earned))
-        player['GP'] += earned
-        player['gold'] = 0
+        sell_ore(player, ['G', player['gold']])
 
     if earned:
         print("You now have {} GP!".format(player['GP']))
     
-    if player['GP'] >= WIN_GP:   
-        game_state = "win"
 
 
 # manage selling of ores
@@ -824,15 +861,23 @@ def sell_menu(player):
 
     game_state = 'sell'
 
-    valid = show_sell_menu(player)
-
     while True:
+        valid = show_sell_menu(player)
         player_input = prompt(valid)
-        if player_input == 'a':
-            sell_ores(player)
+
+        if player_input == 'b':
+            selection = choose_ore(player, mode='sell')
+            if selection != 'q':
+                sell_ore(player, selection)
+                print("You now have {} GP!".format(player['GP']))
+        elif player_input == 'a':
+            sell_all_ores(player)
             game_state = 'town'
         else:
             game_state = 'town'
+        
+        if player['GP'] >= WIN_GP:   
+            game_state = "win"
         
         if game_state != 'sell':
             break
