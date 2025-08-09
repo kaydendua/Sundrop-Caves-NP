@@ -11,6 +11,7 @@ from time import time
 
 #------------------------- GLOBAL VARIABLES -------------------------
 
+
 game_seed = None
 game_state = 'main'
 
@@ -574,8 +575,8 @@ def save_game(save_file, game_map, fog, current_map, player):
     print('Game saved.')
 
 
-# attempts to add a score to the high score list
-# if score is a new high score, it will be sorted into the appropriate position
+# adds scores into global save
+# places score in the correct position such that the list is sorted
 def add_high_score(player):
     try:
         global_save = open(GLOBAL_SAVE_FILE, 'r')
@@ -653,7 +654,7 @@ def number_suffix(number):
     return suffixes[last_digit - 1] # note that it returns 'th' if 0, which is correct.
         
 
-# displays the top scores
+# displays the top scores from the scores list
 def show_high_scores():
     with open(GLOBAL_SAVE_FILE, 'r') as global_save:
         data = global_save.read().split('\n')
@@ -662,6 +663,8 @@ def show_high_scores():
             print()
             print("--------------------- HIGH SCORES ---------------------")
             for score_pos in range(LEADERBOARD_SIZE):
+                if score_pos == len(data):
+                    break
                 high_score = data[score_pos].split(',')
 
                 # high score is processed like this so commas in the name will not interfere
@@ -1169,7 +1172,7 @@ def portal_stone(player, current_map):
     if player['y'] == 0 and player['x'] == 0:
         print('You return to town.')
     else:
-        if player['portal_y'] != 0 and player['portal_x'] != 0:
+        if not (player['portal_y'] == 0 and player['portal_x'] == 0):
             current_map[player['portal_y']][player['portal_x']] = ' '
         player['portal_y'] = player['y']
         player['portal_x'] = player['x']
