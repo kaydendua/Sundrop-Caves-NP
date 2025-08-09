@@ -19,7 +19,7 @@ fog = []
 
 MAX_SAVE_SLOTS = 5
 
-PLAYER_DICT_SIZE = 18
+PLAYER_DICT_SIZE = 20
 PLAYER_DATA_LINES = 50
 MAP_NODES = ['T', 'C', 'S', 'G', 'P']
 FOG_NODES = ['?']
@@ -321,6 +321,8 @@ def initialize_game(save_file, game_map, fog, current_map, player):
     player['copper_price'] = randint(prices['copper'][0], prices['copper'][1])
     player['silver_price'] = randint(prices['silver'][0], prices['silver'][1])
     player['gold_price'] = randint(prices['gold'][0], prices['gold'][1])
+    player['warehouse_level'] = 1
+    player['warehouse'] = ''
 
     save_game(save_file, game_map, fog, current_map, player)
 
@@ -372,9 +374,9 @@ def clear_fog(fog, nodes):
 
 
 # This function draws the 3x3 viewport
-def draw_view(current_map, player, nodes, view_padding):
+def draw_view(current_map, player, nodes):
     view_size = 2 * player['torch_level'] + 1 
-    view = '+' + '-' * view_size * (view_padding + 1) + '-' * view_padding + '+\n|' + ' ' * view_padding
+    view = '+' + '-' * view_size + '-' * (view_size + 1) * VIEW_PADDING + '+\n|' + ' ' * VIEW_PADDING
     pos = 1
     for node in nodes:
         row = node[0]
@@ -390,15 +392,15 @@ def draw_view(current_map, player, nodes, view_padding):
             view += ' '
 
         if pos < view_size:
-            view += view_padding * ' '
+            view += VIEW_PADDING * ' '
             pos += 1
         elif node == nodes[-1]:
-            view += ' ' * view_padding + '|\n'
+            view += ' ' * VIEW_PADDING + '|\n'
         else:
-            view += ' ' * view_padding + '|\n|' + ' ' * view_padding
+            view += ' ' * VIEW_PADDING + '|\n|' + ' ' * VIEW_PADDING
             pos = 1
 
-    view += '+' + '-' * view_size * (view_padding + 1) + '-' * view_padding + '+' 
+    view += '+' + '-' * view_size + '-' * (view_size + 1) * VIEW_PADDING + '+' 
     return view
 
 
@@ -432,6 +434,7 @@ def save_file_details(save_file):
     save_file_info = [] 
     try: 
         with open(save_file, 'r') as save:
+            save.readline() # skip seed
             save.readline() # skip game state
             save_file_info.append(save.readline().strip().split(',',1)[1]) # get name
             save_file_info.append(save.readline().strip().split(',')[1]) # get day
@@ -509,7 +512,7 @@ def save_game(save_file, game_map, fog, current_map, player):
         save_data.append('{},{}'.format(key, player[key]))
 
     # padding
-    save_data.append('\n' * (((1 + PLAYER_DATA_LINES) - len(save_data)) - 1))
+    save_data.append('\n' * (((2 + PLAYER_DATA_LINES) - len(save_data)) - 1))
 
     # save game map
     for row in game_map:
@@ -697,6 +700,67 @@ def load_game(save_file, game_map, fog, current_map, player):
         quit()
 
 
+# display warehouse menu and determine valid inputs and upgrade price
+def show_warehouse_menu(player):
+    print()
+    print('Warehouse')
+    size = 2 + player['warehouse_level']
+    print('+' + '-' * size + '-' * (size + 1) * VIEW_PADDING + '+')
+
+    view_row = ''
+    for node in range(size ** 2):
+        if node < len(player['warehouse']):
+            view_row += player['warehouse'][node]
+        else:
+            view_row += ' '
+        
+        view_row += VIEW_PADDING * ' '
+
+        if len(view_row) == size + size * VIEW_PADDING:
+            print('|' + VIEW_PADDING * ' ' + view_row + '|')
+            view_row = ''
+
+    print('+' + '-' * size + '-' * (size + 1) * VIEW_PADDING + '+')
+    print('Level: {} ({}x{})'.format(player['warehouse_level'], size, size))
+    price = 5 + player['warehouse_level'] * 25
+    if sum([player[mineral] for mineral in minerals]) > 0:
+        valid = '[sul]'
+        print('(S)tore ores, ', end='')
+    else:
+        valid = '[ul]'
+    print('(U)pgrade storage ({} GP), (L)eave'.format(price))
+
+    return price, valid
+
+
+# manage navigation of warehouse menu and upgrades
+def warehouse_menu(player):
+
+    global game_state
+
+    game_state = 'warehouse'
+
+    while True:
+        price, valid = show_warehouse_menu(player)
+
+        player_input = prompt(valid)
+
+        if player_input == 's':
+            pass
+        elif player_input == 'u':
+            if player['GP'] >= price:
+                player['warehouse_level'] += 1
+                size = 2 + player['warehouse_level']
+                print('Congratulations! Your warehouse is now level {} ({}x{})!'.format(player['warehouse_level'], size, size))
+                player['GP'] -= price
+            else:
+                print('You do not have enough GP for this upgrade!')
+        else:
+            game_state = 'town'
+
+        if game_state != 'warehouse':
+            break
+
 # display sell menu
 def show_sell_menu(player):
     
@@ -720,6 +784,37 @@ def show_sell_menu(player):
     print('------------------------')
 
     return valid
+
+
+# Sells all player ores
+def sell_ores(player):
+
+    global game_state
+
+    earned = 0
+    if player['copper']:
+        earned = player['copper'] * player['copper_price']
+        print("You sell {} copper ore for {} GP.".format(player['copper'], earned))
+        player['GP'] += earned
+        player['copper'] = 0
+
+    if player['silver']:
+        earned = player['silver'] * player['silver_price']
+        print("You sell {} silver ore for {} GP.".format(player['silver'], earned))
+        player['GP'] += earned
+        player['silver'] = 0
+
+    if player['gold']:
+        earned = player['gold'] * player['gold_price']
+        print("You sell {} gold ore for {} GP.".format(player['gold'], earned))
+        player['GP'] += earned
+        player['gold'] = 0
+
+    if earned:
+        print("You now have {} GP!".format(player['GP']))
+    
+    if player['GP'] >= WIN_GP:   
+        game_state = "win"
 
 
 # manage selling of ores
@@ -813,7 +908,7 @@ def show_mine_menu(current_map, player):
     print()
     print('DAY', player['day'])
     nodes = get_surrounding_nodes([player['y'], player['x']], player['torch_level'])
-    viewport = draw_view(current_map, player, nodes, VIEW_PADDING)
+    viewport = draw_view(current_map, player, nodes)
     print(viewport)
     print('Turns left: {:<5} Load: {} / {}    Steps: {}'.format(player['turns'], sum([player[mineral] for mineral in minerals]), player['backpack_capacity'], player['steps']))
     print('(WASD) to move')
@@ -894,36 +989,8 @@ def attempt_move(player_action, player, current_map):
     else:
         return test_y, test_x, True
 
-def sell_ores(player):
 
-    global game_state
-
-    earned = 0
-    if player['copper']:
-        earned = player['copper'] * player['copper_price']
-        print("You sell {} copper ore for {} GP.".format(player['copper'], earned))
-        player['GP'] += earned
-        player['copper'] = 0
-
-    if player['silver']:
-        earned = player['silver'] * player['silver_price']
-        print("You sell {} silver ore for {} GP.".format(player['silver'], earned))
-        player['GP'] += earned
-        player['silver'] = 0
-
-    if player['gold']:
-        earned = player['gold'] * player['gold_price']
-        print("You sell {} gold ore for {} GP.".format(player['gold'], earned))
-        player['GP'] += earned
-        player['gold'] = 0
-
-    if earned:
-        print("You now have {} GP!".format(player['GP']))
-    
-    if player['GP'] >= WIN_GP:   
-        game_state = "win"
-
-# handles selling and new day
+# handles sell prices and new day
 def return_to_town(player):
 
     global game_state
@@ -1050,6 +1117,7 @@ def show_town_menu():
     print("----- Sundrop Town -----")
     print("(B)uy stuff")
     print("(S)ell ores")
+    print("Go to (W)arehouse")
     print("See Player (I)nformation")
     print("See Mine (M)ap")
     print("(E)nter mine")
@@ -1065,11 +1133,13 @@ def town(save_file, game_map, fog, current_map, player):
     
     while True:
         show_town_menu()
-        player_action = prompt('[bsimevq]')
+        player_action = prompt('[bswimevq]')
         if player_action == 'b':
             shop_menu(player)
         elif player_action == 's':
             sell_menu(player)
+        elif player_action == 'w':
+            warehouse_menu(player)
         elif player_action == 'i':
             show_information(player)
         elif player_action == 'm':
