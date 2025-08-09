@@ -754,14 +754,35 @@ def show_warehouse_menu(player):
     print('+' + '-' * size + '-' * (size + 1) * VIEW_PADDING + '+')
     print('Level: {} ({}x{})'.format(player['warehouse_level'], size, size))
     price = 5 + player['warehouse_level'] * 25
-    if sum([player[mineral] for mineral in minerals]) > 0:
-        valid = '[sul]'
-        print('(S)tore ores, ', end='')
+
+    if player['warehouse'] == size ** 2:
+        print('The warehouse is full!')
+        valid = '[ul]'
+    elif sum([player[mineral] for mineral in minerals]) > 0:
+        valid = '[saul]'
+        print('(S)tore ores, Store (A)ll')
     else:
+        print('You have no ores!')
         valid = '[ul]'
     print('(U)pgrade storage ({} GP), (L)eave'.format(price))
 
     return price, valid
+
+
+# automatically store as many ores as possible from player backpack
+def store_all_ores(player):
+    ores_to_be_stored = ''.join([player[mineral_names[mineral]] * mineral for mineral in mineral_names.keys()])
+    ores_to_be_stored = ores_to_be_stored[:(2 + player['warehouse_level'])**2]
+    
+    storage_dict = {}
+    for mineral in mineral_names.keys():
+        if mineral in ores_to_be_stored:
+            storage_dict[mineral] = ores_to_be_stored.count(mineral)
+            player[mineral_names[mineral]] -= ores_to_be_stored.count(mineral) 
+    
+    for mineral in storage_dict.keys():
+        print('You stored {} {}!'.format(storage_dict[mineral], mineral_names[mineral]))
+        player['warehouse'] += storage_dict[mineral] * mineral 
 
 
 # manage navigation of warehouse menu and upgrades
@@ -777,7 +798,16 @@ def warehouse_menu(player):
         player_input = prompt(valid)
 
         if player_input == 's':
-            pass
+            selection = choose_ore(player, 'store')
+            if selection != 'q':
+                ore = selection[0]
+                count = selection[1]
+                if count > (2 + player['warehouse_level'])**2 - len(player['warehouse']):
+                    count = (2 + player['warehouse_level'])**2 - len(player['warehouse'])
+                player['warehouse'] += ore * count
+                print('You stored {} {}!'.format(count, mineral_names[ore]))
+        elif player_input == 'a':
+            store_all_ores(player)
         elif player_input == 'u':
             if player['GP'] >= price:
                 player['warehouse_level'] += 1
@@ -839,7 +869,6 @@ def sell_all_ores(player):
 
     global game_state
 
-    earned = 0
     if player['copper']:
         sell_ore(player, ['C', player['copper']])
 
@@ -849,8 +878,7 @@ def sell_all_ores(player):
     if player['gold']:
         sell_ore(player, ['G', player['gold']])
 
-    if earned:
-        print("You now have {} GP!".format(player['GP']))
+    print("You now have {} GP!".format(player['GP']))
     
 
 
