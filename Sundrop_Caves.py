@@ -3,8 +3,10 @@ import pytest
 from re import fullmatch
 from time import time
 
-# TODO:
-# warehouse and selling 
+# TODO: 
+# add continue game after end
+# maybe work on saving
+# maybe add settings
 
 
 #------------------------- GLOBAL VARIABLES -------------------------
@@ -28,7 +30,7 @@ MAP_WIDTH = 0
 MAP_HEIGHT = 0
 
 TURNS_PER_DAY = 20
-WIN_GP = 500
+WIN_GP = 1000
 
 PICKAXE_MAX_LEVEL = 3
 BACKPACK_UPGRADE_AMOUNT = 2
@@ -929,8 +931,6 @@ def sell_ore(player, selection):
 # Sells all player ores
 def sell_all_ores(player):
 
-    global game_state
-
     if player['copper']:
         sell_ore(player, ['C', player['copper']])
 
@@ -1166,12 +1166,11 @@ def win_game(save_file, game_map, fog, current_map, player):
 
 # handles using portal stone
 def portal_stone(player, current_map):
-    if player['portal_y'] != 0 and player['portal_x'] != 0:
-        current_map[player['portal_y']][player['portal_x']] = ' '
-        
     if player['y'] == 0 and player['x'] == 0:
         print('You return to town.')
     else:
+        if player['portal_y'] != 0 and player['portal_x'] != 0:
+            current_map[player['portal_y']][player['portal_x']] = ' '
         player['portal_y'] = player['y']
         player['portal_x'] = player['x']
         current_map[player['portal_y']][player['portal_x']] = 'P'
