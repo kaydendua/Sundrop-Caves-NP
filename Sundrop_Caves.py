@@ -67,7 +67,6 @@ drop_rates['gold'] = (1, 2)
 
 # This function handles all prompts. It takes in a regex expression of valid inputs and
 # loops until it receives a valid input.
-# TODO: update to regex
 def prompt(valid=None, message='Your choice? '):      
     while True:
         player_input = input(message).lower()
@@ -278,6 +277,8 @@ def initialize_game(save_file, game_map, fog, current_map, player):
     global MAP_HEIGHT
     global MAP_WIDTH
 
+    # use random seeds to prevent players from repeatedly quitting and restarting to get better luck
+    # also allows for players to do repeated runs with the same random seed to eliminate randomness
     game_seed = time()
     seed(game_seed)
 
@@ -433,20 +434,23 @@ def choose_backpack_ore(player, mode):
         player_input = prompt(valid, "Choose a mineral to {} (Q to cancel): ".format(mode))
         if player_input.upper() in mineral_names.keys():
             chosen_ore = player_input.upper()
-            ore_count = prompt(r'\d+',"How much {} would you like to {}? ".format(mineral_names[chosen_ore], mode))
+            ore_count = prompt(r'\d+|a',"How much {} would you like to {}? ".format(mineral_names[chosen_ore], mode))
+            if ore_count == 'a': # intuitive that 'a' means sell all, since that applies to other prompts
+                ore_count = player[mineral_names[chosen_ore]]
             return [chosen_ore, int(ore_count)]
         else:
             return 'q'
             
 
 # handles selection of ores to sell from warehouse
-def choose_warehouse_ore(valid):
+def choose_warehouse_ore(player, valid):
     while True:
-        print(valid)
         player_input = prompt(valid, "Choose a mineral to sell (A to sell all, Q to cancel): ")
         if player_input.upper() in mineral_names.keys():
             chosen_ore = player_input.upper()
-            ore_count = prompt(r'\d+',"How much {} would you like to sell? ".format(mineral_names[chosen_ore]))
+            ore_count = prompt(r'\d+|a',"How much {} would you like to sell? ".format(mineral_names[chosen_ore]))
+            if ore_count == 'a':  # intuitive that 'a' means sell all, since that applies to other prompts
+                ore_count = player['warehouse'].count(chosen_ore)
             return [chosen_ore, int(ore_count)]
         elif player_input == 'a':
             return 'a'
@@ -658,7 +662,7 @@ def number_suffix(number):
 def show_high_scores():
     with open(GLOBAL_SAVE_FILE, 'r') as global_save:
         data = global_save.read().split('\n')
-        if data:
+        if len(data[0]) != 0:
             rank = 1
             print()
             print("--------------------- HIGH SCORES ---------------------")
@@ -861,31 +865,37 @@ def sell_from_warehouse(player):
         if mineral.lower() not in valid:
             valid += mineral.lower()
     valid += 'aq]'
-    selection = choose_warehouse_ore(valid)
 
-    if selection == 'a':
-        for ore in mineral_names.keys():
+    if len(player['warehouse']) > 0:
+        selection = choose_warehouse_ore(player, valid)
+
+        if selection == 'a':
+            for ore in mineral_names.keys():
+                ore_name = mineral_names[ore]
+                if ore in player['warehouse']:
+                    ore_count = player['warehouse'].count(ore)
+                    earned = ore_count * player[ore_name + '_price']
+                    print("You sell {} {} ore for {} GP.".format(ore_count, ore_name, earned))
+                    player['GP'] += earned
+
+            print("You now have {} GP!".format(player['GP']))
+            player['warehouse'] = ''
+
+        elif selection != 'q':
+            ore = selection[0]
             ore_name = mineral_names[ore]
-            if ore in player['warehouse']:
-                ore_count = player['warehouse'].count(ore)
-                earned = ore_count * player[ore_name + '_price']
-                print("You sell {} {} ore for {} GP.".format(ore_count, ore_name, earned))
-                player['GP'] += earned
+            count = selection[1]
 
-        player['warehouse'] = ''
+            if count > player['warehouse'].count(ore):
+                count = player['warehouse'].count(ore)
 
-    elif selection != 'q':
-        ore = selection[0]
-        ore_name = mineral_names[ore]
-        count = selection[1]
-
-        if count > player['warehouse'].count(ore):
-            count = player['warehouse'].count(ore)
-
-        earned = player['warehouse'].count(ore) * player[ore_name + '_price']
-        print("You sell {} {} ore for {} GP.".format(count, ore_name, earned))
-        player['GP'] += earned
-        player['warehouse'].replace(selection[0],'',selection[1])
+            earned = count * player[ore_name + '_price']
+            print("You sell {} {} ore for {} GP.".format(count, ore_name, earned))
+            player['GP'] += earned
+            player['warehouse'] = player['warehouse'].replace(selection[0],'',selection[1])
+            print("You now have {} GP!".format(player['GP']))
+    else:
+        print("The warehouse is empty!")
 
 
 # displays sell menu and returns valid player choices
@@ -905,10 +915,11 @@ def show_sell_menu(player):
     else:
         print('Choose from (B)ackpack')
         valid += 'b'
-        print('Choose from (W)arehouse')
-        valid += 'w'
         print('Sell (A)ll')
         valid += 'a'
+
+    print('Choose from (W)arehouse')
+    valid += 'w'
 
     print('(L)eave sell menu')
     valid += 'l]'
@@ -929,7 +940,6 @@ def sell_ore(player, selection):
     player['GP'] += earned
     player[ore_name] = 0
 
-    
 
 # Sells all player ores
 def sell_all_ores(player):
@@ -945,7 +955,6 @@ def sell_all_ores(player):
 
     print("You now have {} GP!".format(player['GP']))
     
-
 
 # manage selling of ores
 def sell_menu(player):
@@ -968,7 +977,6 @@ def sell_menu(player):
             sell_from_warehouse(player)
         elif player_input == 'a':
             sell_all_ores(player)
-            game_state = 'town'
         else:
             print('Bye! See you again!')
             game_state = 'town'
@@ -978,6 +986,7 @@ def sell_menu(player):
         
         if game_state != 'sell':
             break
+
 
 # display shop menu and calculate prices
 def show_shop_menu():
