@@ -944,14 +944,10 @@ def sell_ore(player, selection):
 # Sells all player ores
 def sell_all_ores(player):
 
-    if player['copper']:
-        sell_ore(player, ['C', player['copper']])
-
-    if player['silver']:
-        sell_ore(player, ['S', player['silver']])
-
-    if player['gold']:
-        sell_ore(player, ['G', player['gold']])
+    for mineral in mineral_names.keys():
+        mineral_name = mineral_names[mineral]
+        if player[mineral_name]:
+            sell_ore(player, [mineral, player[mineral_name]])
 
     print("You now have {} GP!".format(player['GP']))
     
