@@ -7,7 +7,8 @@ import json
 """details
 name: Kayden Dua Zhen Xuan
 class: IT03
-date: 26/7/2025
+started on: 26/7/2025
+submitted on: 10/8/2025
 
 This is a python game about mining. You explore a dark cave covered in fog, which gradually
 reveals itself as you explore. You can store your ores in the warehouse, or sell them for a
