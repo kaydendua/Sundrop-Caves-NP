@@ -1,11 +1,7 @@
 from random import randint, seed
-import pytest
 from re import fullmatch
 from time import time
-
-# TODO: 
-# maybe work on saving
-# maybe add settings
+import json
 
 
 #------------------------- GLOBAL VARIABLES -------------------------
@@ -39,7 +35,8 @@ TORCH_MAX_LEVEL = 3
 LEADERBOARD_SIZE = 5
 
 SAVE_FILE_NAME = 'save{}.txt'
-GLOBAL_SAVE_FILE = 'global.txt'
+SCORE_SAVE_FILE = 'scores.txt'
+SETTINGS_SAVE_FILE = 'settings.json' # json just for convenience
 
 VIEW_PADDING = 1
 
@@ -611,12 +608,12 @@ def save_game(save_file, game_map, fog, current_map, player):
 # places score in the correct position such that the list is sorted
 def add_high_score(player):
     try:
-        global_save = open(GLOBAL_SAVE_FILE, 'r')
+        global_save = open(SCORE_SAVE_FILE, 'r')
     except FileNotFoundError:
         # creates empty global save file
-        global_save = open(GLOBAL_SAVE_FILE, 'w')
+        global_save = open(SCORE_SAVE_FILE, 'w')
         global_save.close()
-        global_save = open(GLOBAL_SAVE_FILE, 'r')
+        global_save = open(SCORE_SAVE_FILE, 'r')
         
     data = global_save.read()
     global_save.close()
@@ -658,7 +655,7 @@ def add_high_score(player):
         if score_pos < LEADERBOARD_SIZE:
             print('Congratulations! You have a new high score on the leaderboard!')
 
-        global_save = open(GLOBAL_SAVE_FILE, 'w')
+        global_save = open(SCORE_SAVE_FILE, 'w')
         
         for score_pos in range(len(new_data)):
             if score_pos == len(new_data) - 1:
@@ -667,7 +664,7 @@ def add_high_score(player):
                 global_save.write(new_data[score_pos] + '\n')
 
     else:
-        global_save = open(GLOBAL_SAVE_FILE, 'w')
+        global_save = open(SCORE_SAVE_FILE, 'w')
 
         global_save.write(new_score)
     
@@ -688,7 +685,14 @@ def number_suffix(number):
 
 # displays the top scores from the scores list
 def show_high_scores():
-    with open(GLOBAL_SAVE_FILE, 'r') as global_save:
+    try:
+        global_save = open(SCORE_SAVE_FILE, 'r')
+        global_save.close()
+    except FileNotFoundError:
+        print('There are no high scores as you have not won the game yet.')
+        return
+    
+    with open(SCORE_SAVE_FILE, 'r') as global_save:
         data = global_save.read().split('\n')
         if len(data[0]) != 0:
             rank = 1
@@ -955,6 +959,7 @@ def show_sell_menu(player):
     return valid
 
 
+# sell specific number of specific ores
 def sell_ore(player, selection):
     ore_name = mineral_names[selection[0]]
     count = selection[1]
@@ -1083,7 +1088,7 @@ def show_mine_menu(current_map, player):
     viewport = draw_view(current_map, player, nodes)
     print(viewport)
     print('Turns left: {:<5} Load: {} / {}    Steps: {}'.format(player['turns'], sum([player[mineral] for mineral in minerals]), player['backpack_capacity'], player['steps']))
-    print('(WASD) to move')
+    print('({}) to move'.format(''.join([button.upper() for button in movement_buttons])))
     print('(M)ap, (I)nformation, (P)ortal, (Q)uit to main menu')
 
 
@@ -1357,6 +1362,116 @@ def game(save_file, game_map, fog, current_map, player):
             win_game(save_file, game_map, fog, current_map, player)
 
 
+# displays settings menu
+def show_settings():
+    # movement_buttons -> up, left, down, right
+    print()
+    print("--------- SETTINGS ---------")
+    print("UI:")
+    print(" Leaderboard (S)ize: {:>6}".format(LEADERBOARD_SIZE))
+    if VIEW_PADDING == 1:
+        padding = 'On'
+    else:
+        padding = 'Off'
+    print(" (V)iewport Padding: {:>6}".format(padding))
+    print()
+    print("Keybinds:")
+    print(" (U)p: {:>20}".format(movement_buttons[0].upper()))
+    print(" (L)eft: {:>18}".format(movement_buttons[1].upper()))
+    print(" (D)own: {:>18}".format(movement_buttons[2].upper()))
+    print(" (R)ight: {:>17}".format(movement_buttons[3].upper()))
+    print("----------------------------")
+
+
+# allows the player to change certain global variables
+def settings():
+
+    # globals that can be changed through settings
+    global LEADERBOARD_SIZE
+    global VIEW_PADDING
+    global movement_buttons
+    global movement_map
+    
+    # movement_buttons -> up, left, down, right
+    char_to_index = {'u': 0, 'l': 1, 'd':2, 'r':3}
+
+    while True:
+        show_settings()
+        chosen_setting = prompt('[svuldrq]', 'Which setting would you like to change? (Q to close): ')
+
+        if chosen_setting == 's':
+            new_value = prompt(r'\d+', 'New Leaderboard Size: ')
+            LEADERBOARD_SIZE = int(new_value)
+        elif chosen_setting == 'v':
+            if VIEW_PADDING == 1:
+                print('Turned off Viewport Padding.')
+                VIEW_PADDING = 0
+            else:
+                print('Turned on Viewport Padding.')
+                VIEW_PADDING = 1
+        elif chosen_setting in 'uldr':
+            index = char_to_index[chosen_setting]
+            while True:
+                new_button = prompt('[^mip]', 'Enter a new keybind. (M, I, and P are not accepted, Q to cancel): ')
+                if new_button in movement_buttons:
+                    print("Key already bound. Please choose another.")
+                else:
+                    break
+            
+            if new_button != 'q':
+                old_button = movement_buttons[index] # get old keybind
+                movement_value = movement_map[old_button] # get old movement value
+                movement_map.pop(old_button) # remove old keybind from map
+                movement_buttons[index] = new_button # replace old keybind from buttons with new keybind
+                movement_map[new_button] = movement_value # creates new key:value pair with new keybind and old value
+        else:
+            save_settings()
+            break
+
+
+# Loads the settings from the settings json file
+def load_settings():
+
+    # globals that can be changed through settings
+    global LEADERBOARD_SIZE
+    global VIEW_PADDING
+    global movement_buttons
+    global movement_map
+
+    movement_values = list(movement_map.values())
+
+    with open(SETTINGS_SAVE_FILE, 'r') as settings_file:
+        settings = json.load(settings_file)
+        LEADERBOARD_SIZE = settings['LEADERBOARD_SIZE']
+        VIEW_PADDING = settings['VIEW_PADDING']
+
+        movement_map.clear()
+        movement_buttons.clear()
+
+        movement_buttons.append(settings['Up'])
+        movement_buttons.append(settings['Left'])
+        movement_buttons.append(settings['Down'])
+        movement_buttons.append(settings['Right'])
+
+        for button in range(4):
+            movement_map[movement_buttons[button]] = movement_values[button]
+        
+
+# saves the settings file. Creates if it doesnt exist.
+def save_settings():
+    
+    settings = {}
+    settings['LEADERBOARD_SIZE'] = LEADERBOARD_SIZE
+    settings['VIEW_PADDING'] = VIEW_PADDING
+    settings['Up'] = movement_buttons[0]
+    settings['Left'] = movement_buttons[1]
+    settings['Down'] = movement_buttons[2]
+    settings['Right'] = movement_buttons[3]
+
+    with open(SETTINGS_SAVE_FILE, 'w') as settings_file:
+        json.dump(settings, settings_file, indent=4)
+
+
 # display main menu
 def show_main_menu():
     print()
@@ -1364,6 +1479,7 @@ def show_main_menu():
     print("(N)ew game")
     print("(L)oad saved game")
     print("(H)igh scores")
+    print("(S)ettings")
     print("(Q)uit")
     print("------------------")
 
@@ -1372,10 +1488,10 @@ def show_main_menu():
 def main_menu(game_map, fog, current_map, player):
 
     global game_state
-
+    
     while True:
         show_main_menu()
-        main_menu_choice = prompt('[nlhq]')
+        main_menu_choice = prompt('[nlhsq]')
 
         if main_menu_choice == 'n':
             save_file = choose_save_slot()
@@ -1391,6 +1507,8 @@ def main_menu(game_map, fog, current_map, player):
             game(save_file, game_map, fog, current_map, player)
         elif main_menu_choice == 'h':
             show_high_scores()
+        elif main_menu_choice == 's':
+            settings()
         else:
             break
 
@@ -1405,6 +1523,11 @@ def main():
     print("  and live happily ever after?")
     print("-----------------------------------------------------------")
 
+    try:
+        load_settings()
+    except FileNotFoundError:
+        save_settings()
+
     main_menu(game_map, fog, current_map, player)
 
 
@@ -1412,4 +1535,3 @@ def main():
 # this if statement prevents the whole program from running when a function is accessed from another file
 if __name__ == "__main__":
     main()
-
