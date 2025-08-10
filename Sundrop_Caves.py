@@ -19,7 +19,7 @@ game_map = []
 current_map = []
 fog = []
 
-MAX_SAVE_SLOTS = 5
+MAX_SAVE_SLOTS = 10
 
 PLAYER_DICT_SIZE = 21
 PLAYER_DATA_LINES = 50
@@ -496,7 +496,9 @@ def save_file_details(save_file):
 
 
 # Sundrop Caves has multiple save slots. This function will handle the selection logic.
-def choose_save_slot(saving=True):
+# if a save file has already been chosen, and the player is saving in the middle of playing
+# the function will check if the chosen matches with the preloaded, and skip the warning prompts if so.
+def choose_save_slot(saving=True, preloaded=None):
     while True:
         print()
         print('---------------------------- SAVE SLOTS -----------------------------')
@@ -527,16 +529,21 @@ def choose_save_slot(saving=True):
                 print()
                 print()
             print('---------------------------------------------------------------------')
+        
+        valid = '1'
 
-        valid = '[1-' + str(MAX_SAVE_SLOTS) + ']|[q]'
+        for number in range(1, MAX_SAVE_SLOTS):
+            valid += '|' + str(number + 1)
+        valid += '|q'
 
         save_file = SAVE_FILE_NAME.format(prompt(valid, "Please select a save slot (Q to close): "))
         if 'q' in save_file:
             return save_file
         elif save_file_details(save_file) and saving:
-            if prompt('[yn]', 'Warning! The save slot you have chosen already contains a save file. Are you sure you want to override it? [Y/N]: ') != 'y':
-                print("Cancelling save.")
-                continue
+            if save_file != preloaded:
+                if prompt('[yn]', 'Warning! The save slot you have chosen already contains a save file. Are you sure you want to override it? [Y/N]: ') != 'y':
+                    print("Cancelling save.")
+                    continue
             else:
                 return save_file
         elif not save_file_details(save_file) and not saving:
@@ -1170,7 +1177,7 @@ def win_game(save_file, game_map, fog, current_map, player):
     player['won?'] = True # prevents loading the save file to cause auto win
     add_high_score(player)
 
-    if prompt('[yn]', 'Would you like to continue playing on this save? [Y/N]:') == 'y':
+    if prompt('[yn]', 'Would you like to continue playing on this save? The game will not be saved otherwise. [Y/N]:') == 'y':
         game_state = 'town' 
         save_game(save_file, game_map, fog, current_map, player) # allow player to keep playing after win
     else:
@@ -1300,7 +1307,13 @@ def town(save_file, game_map, fog, current_map, player):
         elif player_action == 'e':
             mine(save_file, game_map, fog, current_map, player)
         elif player_action == 'v':
-            save_game(save_file, game_map, fog, current_map, player)
+            # choosing save option from town allows the player to pick a specific save_file to save into
+            # this will not interfere with saving through quitting to menu, which will save to the file that was chosen at the start.
+            # ^ this is to not interfere with the rest of the saving infrastructure in place.
+            temp_save_file = choose_save_slot(preloaded=save_file)
+            if 'q' in temp_save_file:
+                continue
+            save_game(temp_save_file, game_map, fog, current_map, player)
         else:
             save_or_not = prompt('[yn]',"Would you like to save before quitting? Unsaved data will be lost otherwise. [Y/N]: ")
             if save_or_not == 'y':
