@@ -4,7 +4,6 @@ from re import fullmatch
 from time import time
 
 # TODO: 
-# add continue game after end
 # maybe work on saving
 # maybe add settings
 
@@ -22,7 +21,7 @@ fog = []
 
 MAX_SAVE_SLOTS = 5
 
-PLAYER_DICT_SIZE = 20
+PLAYER_DICT_SIZE = 21
 PLAYER_DATA_LINES = 50
 MAP_NODES = ['T', 'C', 'S', 'G', 'P']
 FOG_NODES = ['?']
@@ -327,6 +326,7 @@ def initialize_game(save_file, game_map, fog, current_map, player):
     player['gold_price'] = randint(prices['gold'][0], prices['gold'][1])
     player['warehouse_level'] = 1
     player['warehouse'] = ''
+    player['won?'] = False
 
     save_game(save_file, game_map, fog, current_map, player)
 
@@ -718,13 +718,15 @@ def load_game(save_file, game_map, fog, current_map, player):
     for line in range(2, PLAYER_DATA_LINES + 2):
         if save_data[line]:
             info = save_data[line].split(',', 1)
-            if info[1].isdigit():
+            if info[1].isdigit(): # string to integer
                 data = int(info[1])
-            elif '[' in info[1]:
+            elif '[' in info[1]: # string to array
                 data = info[1].strip('[]').replace("'", "").replace('"', "").split(',')
                 if data == ['']:
                     data.clear()
-            else:
+            elif info[1] in ["True", "False"]: # string to boolean
+                data = info[1] == "True"
+            else: # just string
                 data = info[1]
             player[info[0]] = data
         else:
@@ -977,7 +979,7 @@ def sell_menu(player):
             print('Bye! See you again!')
             game_state = 'town'
         
-        if player['GP'] >= WIN_GP:   
+        if player['GP'] >= WIN_GP and player['won?'] == False:   
             game_state = "win"
         
         if game_state != 'sell':
@@ -1164,12 +1166,15 @@ def win_game(save_file, game_map, fog, current_map, player):
     print('You now have enough to retire and play video games every day.')
     print('And it only took you {} days and {} steps! You win!'.format(player['day'], player['steps']))
     print('-------------------------------------------------------------')
-
-    save_game(save_file, game_map, fog, current_map, player)
     
+    player['won?'] = True # prevents loading the save file to cause auto win
     add_high_score(player)
 
-    game_state = 'main'
+    if prompt('[yn]', 'Would you like to continue playing on this save? [Y/N]:') == 'y':
+        game_state = 'town' 
+        save_game(save_file, game_map, fog, current_map, player) # allow player to keep playing after win
+    else:
+        game_state = 'main'
 
 
 # handles using portal stone
@@ -1362,6 +1367,7 @@ def main_menu(game_map, fog, current_map, player):
             break
 
 
+# program entry point
 def main():
     print("---------------- Welcome to Sundrop Caves! ----------------")
     print("You spent all your money to get the deed to a mine, a small")
@@ -1375,6 +1381,7 @@ def main():
 
 
 #--------------------------- MAIN GAME ---------------------------
+# this if statement prevents the whole program from running when a function is accessed from another file
 if __name__ == "__main__":
     main()
 
