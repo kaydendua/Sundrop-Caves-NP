@@ -235,7 +235,7 @@ def generate_map(map_width, map_height, spread, min_density, max_density):
                             if distance_from(' ', [row, col], map_struct, True) > spread:
                                 map_struct[row][col] = 'D'
                     
-                    # farthest corner will contain gold
+                    # farthest corner will contain diamond
                     else:
                         if randint(1,3) == 1:
                             if distance_from(' ', [row, col], map_struct, True) > spread:
