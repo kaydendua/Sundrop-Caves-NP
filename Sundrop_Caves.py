@@ -21,9 +21,9 @@ fog = []
 
 MAX_SAVE_SLOTS = 10
 
-PLAYER_DICT_SIZE = 21
+PLAYER_DICT_SIZE = 23
 PLAYER_DATA_LINES = 50
-MAP_NODES = ['T', 'C', 'S', 'G', 'P']
+MAP_NODES = ['T', 'C', 'S', 'G', 'D', 'P']
 FOG_NODES = ['?']
 
 MAP_WIDTH = 0
@@ -32,7 +32,7 @@ MAP_HEIGHT = 0
 TURNS_PER_DAY = 20
 WIN_GP = 1000
 
-PICKAXE_MAX_LEVEL = 3
+PICKAXE_MAX_LEVEL = 4
 BACKPACK_UPGRADE_AMOUNT = 2
 TORCH_MAX_LEVEL = 3
 
@@ -46,19 +46,21 @@ VIEW_PADDING = 1
 movement_buttons = ['w','a','s','d']
 movement_map = {'w':[-1, 0], 'a':[0, -1], 's':[1, 0], 'd':[0, 1]} # [y, x]
 
-minerals = ['copper', 'silver', 'gold']
-mineral_names = {'C': 'copper', 'S': 'silver', 'G': 'gold'}
-pickaxe_prices = [0, 50, 150, None]
+minerals = ['copper', 'silver', 'gold', 'diamond']
+mineral_names = {'C': 'copper', 'S': 'silver', 'G': 'gold', 'D':'diamond'}
+pickaxe_prices = [0, 50, 150, 300, None]
 
 prices = {}
 prices['copper'] = (1, 3)
 prices['silver'] = (5, 8)
 prices['gold'] = (10, 18)
+prices['diamond'] = (20,30)
 
 drop_rates = {}
 drop_rates['copper'] = (1, 5)
 drop_rates['silver'] = (1, 3)
 drop_rates['gold'] = (1, 2)
+drop_rates['diamond'] = (1, 1)
 
 
 #---------------------------------- FUNCTIONS ----------------------------------
@@ -194,22 +196,25 @@ def generate_map(map_width, map_height, spread, min_density, max_density):
                     
                     # main area will contain all ores
                     elif distance_from('T', [row, col], map_struct) < 0.90 * max_distance:
-                        chance = randint(1,16)
+                        chance = randint(1,20)
                         if chance == 1:
                             if distance_from(' ', [row, col], map_struct, True) > spread:
                                 map_struct[row][col] = 'C'
                         elif chance <= 3:
                             if distance_from(' ', [row, col], map_struct, True) > spread:
                                 map_struct[row][col] = 'S'
-                        elif chance == 4:
+                        elif chance <= 5:
                             if distance_from(' ', [row, col], map_struct, True) > spread:
                                 map_struct[row][col] = 'G'
+                        elif chance == 6:
+                            if distance_from(' ', [row, col], map_struct, True) > spread:
+                                map_struct[row][col] = 'D'
                     
                     # farthest corner will contain gold
                     else:
                         if randint(1,3) == 1:
                             if distance_from(' ', [row, col], map_struct, True) > spread:
-                                map_struct[row][col] = 'G'
+                                map_struct[row][col] = 'D'
         
         # place more ore nodes sprouting off the "seed" nodes
         # populate map to desired density
@@ -219,7 +224,7 @@ def generate_map(map_width, map_height, spread, min_density, max_density):
                     if map_struct[row][col] == ' ':
                         if distance_from('T', [row, col], map_struct) <= 1.5:
                             continue
-                        nearby_nodes = neighbour_nodes(map_struct, [row, col], ' CSG')
+                        nearby_nodes = neighbour_nodes(map_struct, [row, col], ' CSGD')
                         if nearby_nodes: # just in case
                             # node becomes a random node from its 8 surrounding nodes 
                             chosen = randint(0, len(nearby_nodes) - 1)
@@ -229,17 +234,20 @@ def generate_map(map_width, map_height, spread, min_density, max_density):
             copper_count = 0
             silver_count = 0
             gold_count = 0
+            diamond_count = 0
             for row in range(map_height):
                 for col in range(map_width):
                     ore = map_struct[row][col]
-                    if ore in 'CSG':
+                    if ore in 'CSGD':
                         ore_count += 1
                         if ore == 'C':
                             copper_count += 1
                         elif ore == 'S':
                             silver_count += 1
-                        else:
+                        elif ore == 'G':
                             gold_count += 1
+                        else:
+                            diamond_count += 1
 
             if ore_count > min_density * map_height * map_width:
                 break
@@ -249,7 +257,7 @@ def generate_map(map_width, map_height, spread, min_density, max_density):
         # therefore, a maximum density check is in place to prevent a map that is too full of ores.
 
         if ore_count < max_density * map_height * map_width:
-            if copper_count >= 20 and silver_count >= 20 and gold_count >= 20: # ensure sufficient ore for the player
+            if copper_count >= 30 and silver_count >= 20 and gold_count >= 20 and 30 >= diamond_count >= 10: # ensure sufficient ore for the player
                 break
 
     return map_struct
@@ -270,6 +278,8 @@ def create_fog(fog):
 
 # sets up empty save file for new game
 def initialize_game(save_file, game_map, fog, current_map, player):
+
+    print('Loading...')
 
     global game_seed
     global game_state
@@ -315,6 +325,7 @@ def initialize_game(save_file, game_map, fog, current_map, player):
     player['copper'] = 0
     player['silver'] = 0
     player['gold'] = 0
+    player['diamond'] = 0
     player['turns'] = TURNS_PER_DAY
     player['pickaxe_level'] = 1
     player['backpack_capacity'] = 10
@@ -324,6 +335,7 @@ def initialize_game(save_file, game_map, fog, current_map, player):
     player['copper_price'] = randint(prices['copper'][0], prices['copper'][1])
     player['silver_price'] = randint(prices['silver'][0], prices['silver'][1])
     player['gold_price'] = randint(prices['gold'][0], prices['gold'][1])
+    player['diamond_price'] = randint(prices['diamond'][0], prices['diamond'][1])
     player['warehouse_level'] = 1
     player['warehouse'] = ''
     player['won?'] = False
@@ -435,7 +447,10 @@ def choose_backpack_ore(player, mode):
         if player_input.upper() in mineral_names.keys():
             chosen_ore = player_input.upper()
             ore_count = prompt(r'\d+|a',"How much {} would you like to {}? ".format(mineral_names[chosen_ore], mode))
-            if ore_count == 'a': # intuitive that 'a' means sell all, since that applies to other prompts
+            if ore_count == 'a' or int(ore_count) > player[mineral_names[chosen_ore]]: 
+                # intuitive that 'a' means sell all, since that applies to other prompts
+                # also since 'a' is the only non numeric value for ore_count, int(ore_count) will not cause an error
+                # due to python evaluating ore_count == 'a' first and stopping since its an or operator
                 ore_count = player[mineral_names[chosen_ore]]
             return [chosen_ore, int(ore_count)]
         else:
@@ -443,13 +458,20 @@ def choose_backpack_ore(player, mode):
             
 
 # handles selection of ores to sell from warehouse
+# yes, the code is very similar to choose_backpack_ore()
+# but I decided to create another function as that is simpler to implement
+# and easier to modify than creating a different mode for choose_backpack_ore()
+# (due to the difference in how backpack and warehouse are processed, its difficult to account for both with parameters)
 def choose_warehouse_ore(player, valid):
     while True:
         player_input = prompt(valid, "Choose a mineral to sell (A to sell all, Q to cancel): ")
         if player_input.upper() in mineral_names.keys():
             chosen_ore = player_input.upper()
             ore_count = prompt(r'\d+|a',"How much {} would you like to sell? ".format(mineral_names[chosen_ore]))
-            if ore_count == 'a':  # intuitive that 'a' means sell all, since that applies to other prompts
+            if ore_count == 'a' or int(ore_count) > player['warehouse'].count(chosen_ore): 
+                # intuitive that 'a' means sell all, since that applies to other prompts
+                # also since 'a' is the only non numeric value for ore_count, int(ore_count) will not cause an error
+                # due to python evaluating ore_count == 'a' first and stopping since its an or operator
                 ore_count = player['warehouse'].count(chosen_ore)
             return [chosen_ore, int(ore_count)]
         elif player_input == 'a':
@@ -544,8 +566,7 @@ def choose_save_slot(saving=True, preloaded=None):
                 if prompt('[yn]', 'Warning! The save slot you have chosen already contains a save file. Are you sure you want to override it? [Y/N]: ') != 'y':
                     print("Cancelling save.")
                     continue
-            else:
-                return save_file
+            return save_file
         elif not save_file_details(save_file) and not saving:
             print('The save slot you chose is empty. Please try again')
             continue
@@ -895,9 +916,6 @@ def sell_from_warehouse(player):
             ore_name = mineral_names[ore]
             count = selection[1]
 
-            if count > player['warehouse'].count(ore):
-                count = player['warehouse'].count(ore)
-
             earned = count * player[ore_name + '_price']
             print("You sell {} {} ore for {} GP.".format(count, ore_name, earned))
             player['GP'] += earned
@@ -940,9 +958,6 @@ def show_sell_menu(player):
 def sell_ore(player, selection):
     ore_name = mineral_names[selection[0]]
     count = selection[1]
-
-    if count > player[ore_name]:
-        count = player[ore_name]
     
     earned = player[ore_name] * player[ore_name + '_price']
     print("You sell {} {} ore for {} GP.".format(player[ore_name], ore_name, earned))
@@ -1157,7 +1172,8 @@ def return_to_town(player):
     player['copper_price'] = randint(prices['copper'][0], prices['copper'][1])
     player['silver_price'] = randint(prices['silver'][0], prices['silver'][1])
     player['gold_price'] = randint(prices['gold'][0], prices['gold'][1])
-    
+    player['diamond_price'] = randint(prices['diamond'][0], prices['diamond'][1])
+
     player['day'] += 1
     player['turns'] = TURNS_PER_DAY
 
@@ -1177,7 +1193,7 @@ def win_game(save_file, game_map, fog, current_map, player):
     player['won?'] = True # prevents loading the save file to cause auto win
     add_high_score(player)
 
-    if prompt('[yn]', 'Would you like to continue playing on this save? The game will not be saved otherwise. [Y/N]:') == 'y':
+    if prompt('[yn]', 'Would you like to continue playing on this save? The game will not be saved otherwise. [Y/N]: ') == 'y':
         game_state = 'town' 
         save_game(save_file, game_map, fog, current_map, player) # allow player to keep playing after win
     else:
@@ -1208,7 +1224,7 @@ def replenish_nodes(game_map, current_map):
                 
                 # gets an array of the node types surrounding the node
                 # with these parameters, it checks current map for empty spaces or ore nodes
-                nearby_node_types = neighbour_nodes(current_map, [row, col], ' CSG')
+                nearby_node_types = neighbour_nodes(current_map, [row, col], ' CSGD')
 
                 # boosts chance of replenishing to 50% if node is isolated
                 if game_map[row][col] not in nearby_node_types:
@@ -1339,7 +1355,6 @@ def game(save_file, game_map, fog, current_map, player):
             break
         elif game_state == 'win':
             win_game(save_file, game_map, fog, current_map, player)
-            break
 
 
 # display main menu
