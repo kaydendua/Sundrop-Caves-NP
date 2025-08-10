@@ -4,6 +4,33 @@ from time import time
 import json
 
 
+"""details
+name: Kayden Dua Zhen Xuan
+class: IT03
+date: 26/7/2025
+
+This is a python game about mining. You explore a dark cave covered in fog, which gradually
+reveals itself as you explore. You can store your ores in the warehouse, or sell them for a
+price that randomly changes every day. Your equipment can be upgraded with the GP you earned
+from selling ores.
+
+Additional features (that I can remember):
++ Git version control
++ Multiple save slots
++ View padding on viewport
++ Node replenishing
++ Torch upgrades
++ Random map generator
++ Random seed with time()
++ Ore warehouse
++ Selling menu
++ Backpack view
++ RegEx input validation
++ Diamond ore
++ Settings with json file
+"""
+
+
 #------------------------- GLOBAL VARIABLES -------------------------
 
 
@@ -410,7 +437,7 @@ def draw_view(current_map, player, nodes):
         elif node == nodes[-1]:
             view += ' ' * VIEW_PADDING + '|\n'
         else:
-            view += ' ' * VIEW_PADDING + '|\n|' + ' ' * VIEW_PADDING
+            view += ' ' * VIEW_PADDING + '|\n|' + VIEW_PADDING * ' '
             pos = 1
 
     view += '+' + '-' * view_size + '-' * (view_size + 1) * VIEW_PADDING + '+' 
@@ -607,16 +634,12 @@ def save_game(save_file, game_map, fog, current_map, player):
 # adds scores into global save
 # places score in the correct position such that the list is sorted
 def add_high_score(player):
-    try:
-        global_save = open(SCORE_SAVE_FILE, 'r')
-    except FileNotFoundError:
-        # creates empty global save file
-        global_save = open(SCORE_SAVE_FILE, 'w')
-        global_save.close()
-        global_save = open(SCORE_SAVE_FILE, 'r')
+    score_save = open(SCORE_SAVE_FILE, 'a') # creates file if it doesnt exist
+    score_save.close()
+    score_save = open(SCORE_SAVE_FILE, 'r')
         
-    data = global_save.read()
-    global_save.close()
+    data = score_save.read()
+    score_save.close()
     
     new_score = ','.join([player['name'], str(player['day']), str(player['steps']), str(player['GP'])])
 
@@ -655,22 +678,20 @@ def add_high_score(player):
         if score_pos < LEADERBOARD_SIZE:
             print('Congratulations! You have a new high score on the leaderboard!')
 
-        global_save = open(SCORE_SAVE_FILE, 'w')
+        score_save = open(SCORE_SAVE_FILE, 'w')
         
         for score_pos in range(len(new_data)):
             if score_pos == len(new_data) - 1:
-                global_save.write(new_data[score_pos])
+                score_save.write(new_data[score_pos])
             else:
-                global_save.write(new_data[score_pos] + '\n')
+                score_save.write(new_data[score_pos] + '\n')
 
     else:
-        global_save = open(SCORE_SAVE_FILE, 'w')
-
-        global_save.write(new_score)
-    
+        score_save = open(SCORE_SAVE_FILE, 'w')
+        score_save.write(new_score)
         print('Congratulations! You have a new high score on the leaderboard!')
 
-    global_save.close()
+    score_save.close()
 
 
 # returns the appropriate suffix for a number
@@ -685,15 +706,11 @@ def number_suffix(number):
 
 # displays the top scores from the scores list
 def show_high_scores():
-    try:
-        global_save = open(SCORE_SAVE_FILE, 'r')
-        global_save.close()
-    except FileNotFoundError:
-        print('There are no high scores as you have not won the game yet.')
-        return
+    score_save = open(SCORE_SAVE_FILE, 'a') # create file if it doesnt exist
+    score_save.close()
     
-    with open(SCORE_SAVE_FILE, 'r') as global_save:
-        data = global_save.read().split('\n')
+    with open(SCORE_SAVE_FILE, 'r') as score_save:
+        data = score_save.read().split('\n')
         if len(data[0]) != 0:
             rank = 1
             print()
@@ -818,7 +835,7 @@ def show_warehouse_menu(player):
     upgrade_price = 5 + player['warehouse_level'] * 25
 
     valid = '['
-    if player['warehouse'] == (2 + player['warehouse_level']) ** 2:
+    if len(player['warehouse']) == (2 + player['warehouse_level']) ** 2:
         print('The warehouse is full!')
     elif sum([player[mineral] for mineral in minerals]) > 0:
         valid += 'sa'
@@ -837,19 +854,18 @@ def show_warehouse_menu(player):
 
 # automatically store as many ores as possible from player backpack
 def store_all_ores(player):
-    ores_to_be_stored = ''.join([player[mineral_names[mineral]] * mineral for mineral in mineral_names.keys()])
-    ores_to_be_stored = ores_to_be_stored[:(2 + player['warehouse_level'])**2]
-    
-    storage_dict = {}
-    for mineral in mineral_names.keys():
-        if mineral in ores_to_be_stored:
-            storage_dict[mineral] = ores_to_be_stored.count(mineral)
-            player[mineral_names[mineral]] -= ores_to_be_stored.count(mineral) 
-    
-    for mineral in storage_dict.keys():
-        print('You stored {} {}!'.format(storage_dict[mineral], mineral_names[mineral]))
-        player['warehouse'] += storage_dict[mineral] * mineral 
+    minerals = list(mineral_names.keys())
+    minerals.reverse() # prioritises most valuable ores
+    remaining_space = (2 + player['warehouse_level']) ** 2 - len(player['warehouse'])
 
+    for mineral in minerals:
+        if player[mineral_names[mineral]] > 0 and remaining_space > 0:
+            count = min(remaining_space, player[mineral_names[mineral]])
+            player['warehouse'] += count * mineral 
+            player[mineral_names[mineral]] -= count
+            remaining_space -= count
+            print('You stored {} {}!'.format(count, mineral_names[mineral]))
+        
 
 # manage navigation of warehouse menu and upgrades
 def warehouse_menu(player):
@@ -868,9 +884,9 @@ def warehouse_menu(player):
             if selection != 'q':
                 ore = selection[0]
                 count = selection[1]
-                if count > (2 + player['warehouse_level'])**2 - len(player['warehouse']):
-                    count = (2 + player['warehouse_level'])**2 - len(player['warehouse'])
+                count = min(count, (2 + player['warehouse_level'])**2 - len(player['warehouse']))
                 player['warehouse'] += ore * count
+                player[mineral_names[ore]] -= count
                 print('You stored {} {}!'.format(count, mineral_names[ore]))
         elif player_input == 'a':
             store_all_ores(player)
@@ -886,6 +902,9 @@ def warehouse_menu(player):
                 print('You do not have enough GP for this upgrade!')
         else:
             game_state = 'town'
+        
+        if player['GP'] >= WIN_GP and player['won?'] == False:
+            game_state = 'win'
 
         if game_state != 'warehouse':
             break
@@ -964,10 +983,10 @@ def sell_ore(player, selection):
     ore_name = mineral_names[selection[0]]
     count = selection[1]
     
-    earned = player[ore_name] * player[ore_name + '_price']
-    print("You sell {} {} ore for {} GP.".format(player[ore_name], ore_name, earned))
+    earned = count * player[ore_name + '_price']
+    print("You sell {} {} ore for {} GP.".format(count, ore_name, earned))
     player['GP'] += earned
-    player[ore_name] = 0
+    player[ore_name] -= count
 
 
 # Sells all player ores
